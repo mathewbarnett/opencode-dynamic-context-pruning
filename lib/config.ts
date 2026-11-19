@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { readFileSync, existsSync, statSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
-import { parse } from "jsonc-parser"
+import { parse, type ParseError } from "jsonc-parser"
 type ConfigContext = {
     directory: string
     client: {
@@ -630,18 +631,16 @@ function showConfigWarnings(
         }
     }
 
-    setTimeout(() => {
-        try {
-            ctx.client.tui.showToast({
-                body: {
-                    title: `DCP: ${configType} warning`,
-                    message: `${configPath}\n${messages.join("\n")}`,
-                    variant: "warning",
-                    duration: 7000,
-                },
-            })
-        } catch {}
-    }, 7000)
+    try {
+        ctx.client.tui.showToast({
+            body: {
+                title: `DCP: ${configType} warning`,
+                message: `${configPath}\n${messages.join("\n")}`,
+                variant: "warning",
+                duration: 7000,
+            },
+        })
+    } catch {}
 }
 
 const defaultConfig: PluginConfig = {
@@ -768,7 +767,14 @@ function loadConfigFile(configPath: string): ConfigLoadResult {
     }
 
     try {
-        const parsed = parse(fileContent, undefined, { allowTrailingComma: true })
+        const errors: ParseError[] = []
+        const parsed = parse(fileContent, errors, { allowTrailingComma: true })
+        // jsonc-parser is error-tolerant: it returns a partial value and records
+        // problems in `errors` instead of throwing. Treat those as parse failures
+        // so malformed config never leaks into the merged settings.
+        if (errors.length > 0) {
+            return { data: null, parseError: `Invalid JSONC at offset ${errors[0]!.offset}` }
+        }
         if (parsed === undefined || parsed === null) {
             return { data: null, parseError: "Config file is empty or invalid" }
         }
@@ -926,19 +932,17 @@ function mergeLayer(config: PluginConfig, data: Record<string, any>): PluginConf
     }
 }
 
-function scheduleParseWarning(ctx: ConfigContext, title: string, message: string): void {
-    setTimeout(() => {
-        try {
-            ctx.client.tui.showToast({
-                body: {
-                    title,
-                    message,
-                    variant: "warning",
-                    duration: 7000,
-                },
-            })
-        } catch {}
-    }, 7000)
+function showParseWarning(ctx: ConfigContext, title: string, message: string): void {
+    try {
+        ctx.client.tui.showToast({
+            body: {
+                title,
+                message,
+                variant: "warning",
+                duration: 7000,
+            },
+        })
+    } catch {}
 }
 
 export function getConfig(ctx: ConfigContext): PluginConfig {
@@ -958,7 +962,7 @@ export function getConfig(ctx: ConfigContext): PluginConfig {
 
         const result = loadConfigFile(layer.path)
         if (result.parseError) {
-            scheduleParseWarning(
+            showParseWarning(
                 ctx,
                 `DCP: Invalid ${layer.name}`,
                 `${layer.path}\n${result.parseError}\nUsing previous/default values`,

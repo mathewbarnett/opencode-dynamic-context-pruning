@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // These format schemas are kept separate from the editable compress prompts
 // so they cannot be modified via custom prompt overrides. The schemas must
 // match the tool's input validation and are not safe to change independently.

@@ -1,5 +1,7 @@
-import type { PermissionAction } from "../host-permissions"
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { matchesGlob } from "../protected-patterns"
+
+type PermissionAction = "ask" | "allow" | "deny"
 
 export interface NativePermissionRule {
     action?: unknown

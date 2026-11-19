@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * DCP Manual mode command handler.
  * Handles toggling manual mode and triggering individual tool executions.

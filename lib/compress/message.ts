@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { defineTool, schema, type ToolDefinition } from "../tool-schema"
 import type { ToolContext } from "./types"
 import { countTokens } from "../token-utils"

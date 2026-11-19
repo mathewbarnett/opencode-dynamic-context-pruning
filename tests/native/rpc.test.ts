@@ -8,6 +8,13 @@ test("rpc definition uses the dcp namespace", () => {
     assert.deepEqual(Object.keys(rpc.events), ["notification", "openPanel"])
 })
 
+test("openPanel events are scoped to a session", () => {
+    assert.deepEqual(rpc.events.openPanel.schema.parse({ sessionID: "ses_1" }), {
+        sessionID: "ses_1",
+    })
+    assert.throws(() => rpc.events.openPanel.schema.parse({}))
+})
+
 test("status method schemas validate their payloads", () => {
     assert.deepEqual(rpc.methods.status.input.parse({}), {})
     assert.deepEqual(rpc.methods.status.output.parse({ enabled: true }), { enabled: true })

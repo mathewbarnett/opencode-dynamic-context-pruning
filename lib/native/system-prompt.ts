@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { SystemPart } from "@opencode/ai"
 import type { PluginConfig } from "../config"
 import type { Logger } from "../logger"
@@ -40,7 +41,8 @@ export function injectNativeSystemPrompt(
 
     if (compressPermission(state, config) === "deny") return
 
-    prompts.reload()
+    // The context hook reloads prompts once before nudges are injected; doing it
+    // again here would re-read every override file twice per request.
     const newPrompt = renderSystemPrompt(
         prompts.getRuntimePrompts(),
         buildProtectedToolsExtension(config.compress.protectedTools),

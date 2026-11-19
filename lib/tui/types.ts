@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { Plugin } from "@opencode/plugin/tui"
 import type { RGBA } from "@opentui/core"
 import type { buildStatsReport } from "../commands/stats"

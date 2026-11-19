@@ -75,6 +75,8 @@
         "dcp.schema.json",
         "dcp.example.jsonc",
         "README.md",
+        "CHANGELOG.md",
+        "NOTICE",
         "LICENSE"
     ]
 }

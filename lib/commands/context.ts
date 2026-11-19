@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * DCP Context Command
  * Shows a visual breakdown of token usage in the current session.

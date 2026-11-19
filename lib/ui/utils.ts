@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { SessionState, ToolParameterEntry, WithParts } from "../state"
 import { countTokens } from "../token-utils"
 import { isIgnoredUserMessage } from "../messages/query"

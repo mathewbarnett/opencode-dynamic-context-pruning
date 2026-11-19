@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 export const MANUAL_MODE_SYSTEM_EXTENSION = `<dcp-system-reminder>
 Manual mode is enabled. Do NOT use compress unless the user has explicitly triggered it through a manual marker.
 

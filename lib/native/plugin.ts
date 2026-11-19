@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { Plugin } from "@opencode/plugin"
 import { getConfig } from "../config"
 import { Logger } from "../logger"
@@ -35,19 +36,35 @@ import { injectNativeSystemPrompt } from "./system-prompt"
 import { executeNativeCommand } from "./commands"
 
 export async function setup(ctx: Plugin.Context) {
+    // Config is loaded before the RPC notification channel exists, so collect
+    // config warnings here and flush them once emitNotification is wired up.
+    const pendingWarnings: NotificationEvent[] = []
     const warnings = {
         tui: {
-            showToast: async (input: { body: { message: string } }) => {
-                console.warn(`DCP: ${input.body.message}`)
+            showToast: async (input: {
+                body: { title?: string; message: string; variant?: string; duration?: number }
+            }) => {
+                pendingWarnings.push({
+                    title: input.body.title ?? "DCP config",
+                    message: input.body.message,
+                    variant: "warning",
+                    duration: input.body.duration,
+                })
             },
         },
     }
-    const config = getConfig({ directory: ctx.location.directory, client: warnings })
+    function flushWarnings(emit: (event: NotificationEvent) => Promise<void>): void {
+        for (const event of pendingWarnings.splice(0)) void emit(event).catch(() => {})
+    }
+    let config = getConfig({ directory: ctx.location.directory, client: warnings })
     if (!config.enabled) {
         await ctx.rpc.register(
             { ...rpc, methods: { status: rpc.methods.status } },
             { status: async () => ({ enabled: false }) },
         )
+        flushWarnings(async (event) => {
+            console.warn(`DCP: ${event.title}: ${event.message}`)
+        })
         return
     }
     const logger = new Logger(config.debug)
@@ -60,6 +77,14 @@ export async function setup(ctx: Plugin.Context) {
     const sessions = new Map<string, SessionState>()
     const queues = new Map<string, Promise<unknown>>()
     const limits = new Map<string, number>()
+    const MAX_CACHED_SESSIONS = 100
+    function trimSessionCache(): void {
+        while (sessions.size > MAX_CACHED_SESSIONS) {
+            const oldest = sessions.keys().next()
+            if (oldest.done) return
+            sessions.delete(oldest.value)
+        }
+    }
     const registrations: Array<{ dispose(): Promise<void> }> = []
     registrations.push(
         await ctx.permission.hook("evaluate", (evaluation) =>
@@ -71,14 +96,35 @@ export async function setup(ctx: Plugin.Context) {
         bash: "shell",
         apply_patch: "patch",
     }
-    for (const list of [
-        config.compress.protectedTools,
-        config.commands.protectedTools,
-        config.strategies.deduplication.protectedTools,
-        config.strategies.purgeErrors.protectedTools,
-    ]) {
-        for (const name of [...list])
-            if (aliases[name] && !list.includes(aliases[name]!)) list.push(aliases[name]!)
+    const withAliases = (list: string[]): string[] => {
+        const result = [...list]
+        for (const name of [...result]) {
+            const alias = aliases[name]
+            if (alias && !result.includes(alias)) result.push(alias)
+        }
+        return result
+    }
+    // Replace the affected lists instead of mutating the loaded config in place.
+    config = {
+        ...config,
+        commands: {
+            ...config.commands,
+            protectedTools: withAliases(config.commands.protectedTools),
+        },
+        compress: {
+            ...config.compress,
+            protectedTools: withAliases(config.compress.protectedTools),
+        },
+        strategies: {
+            deduplication: {
+                ...config.strategies.deduplication,
+                protectedTools: withAliases(config.strategies.deduplication.protectedTools),
+            },
+            purgeErrors: {
+                ...config.strategies.purgeErrors,
+                protectedTools: withAliases(config.strategies.purgeErrors.protectedTools),
+            },
+        },
     }
 
     function serial<T>(sessionID: string, operation: () => Promise<T>): Promise<T> {
@@ -93,7 +139,7 @@ export async function setup(ctx: Plugin.Context) {
     }
 
     let emitNotification: (event: NotificationEvent) => Promise<void> = async () => {}
-    let emitOpenPanel: () => Promise<void> = async () => {}
+    let emitOpenPanel: (sessionID: string) => Promise<void> = async () => {}
     const notifier = createNotifier(async (event) => emitNotification(event))
     const client = {
         session: {
@@ -129,6 +175,7 @@ export async function setup(ctx: Plugin.Context) {
         if (!state) {
             state = createSessionState("compact")
             sessions.set(sessionID, state)
+            trimSessionCache()
         }
         const messages = history(entries, session)
         await ensureSessionInitialized(
@@ -282,7 +329,7 @@ export async function setup(ctx: Plugin.Context) {
                             name === "dcp" ? "DCP commands" : "Trigger DCP manual compression",
                         execute: async (invocation) => {
                             if (name === "dcp" && !invocation.prompt.text.trim()) {
-                                await emitOpenPanel()
+                                await emitOpenPanel(invocation.sessionID)
                                 return
                             }
                             const prompt = await serial(invocation.sessionID, async () => {
@@ -348,7 +395,8 @@ export async function setup(ctx: Plugin.Context) {
             }),
     })
     emitNotification = (event) => rpcRegistration.events.emit("notification", event)
-    emitOpenPanel = () => rpcRegistration.events.emit("openPanel", {})
+    flushWarnings(emitNotification)
+    emitOpenPanel = (sessionID) => rpcRegistration.events.emit("openPanel", { sessionID })
     registrations.push(rpcRegistration)
     logger.info("DCP native initialized")
     return async () => {

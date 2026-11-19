@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { Message, ContentPart, ToolResultPart } from "@opencode/ai"
 import type { Plugin } from "@opencode/plugin"
 import type { WithParts } from "../state"

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { RuntimePrompts } from "./store"
 export type { PromptStore, RuntimePrompts } from "./store"
 

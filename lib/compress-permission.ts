@@ -1,25 +1,15 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { PluginConfig } from "./config"
-import { type HostPermissionSnapshot, resolveEffectiveCompressPermission } from "./host-permissions"
-import type { SessionState, WithParts } from "./state"
-import { getLastUserMessage } from "./messages/query"
+import type { SessionState } from "./state"
 
+/**
+ * Effective compress permission for the native OC2 path. Host rules are
+ * resolved once in `resolveCompressPermission` and cached on the session;
+ * this helper just reads that cached value with the config as fallback.
+ */
 export const compressPermission = (
     state: SessionState,
     config: PluginConfig,
 ): "ask" | "allow" | "deny" => {
     return state.compressPermission ?? config.compress.permission
-}
-
-export const syncCompressPermissionState = (
-    state: SessionState,
-    config: PluginConfig,
-    hostPermissions: HostPermissionSnapshot,
-    messages: WithParts[],
-): void => {
-    const activeAgent = getLastUserMessage(messages)?.info.agent
-    state.compressPermission = resolveEffectiveCompressPermission(
-        config.compress.permission,
-        hostPermissions,
-        activeAgent,
-    )
 }

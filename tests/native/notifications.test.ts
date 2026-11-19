@@ -142,6 +142,6 @@ test("bare /dcp emits openPanel instead of registering a second slash command", 
         prompt: { text: "" },
         delivery: "ui",
     })
-    assert.deepEqual(mock.rpcEvents, [{ name: "openPanel", data: {} }])
+    assert.deepEqual(mock.rpcEvents, [{ name: "openPanel", data: { sessionID: "ses_1" } }])
     await cleanup?.()
 })

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { SessionState, WithParts } from "./state"
 import type { MessageInfo } from "./message-info"
 import { Logger } from "./logger"

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { z } from "zod"
 
 export const notificationEvent = z.object({
@@ -61,6 +62,8 @@ export const rpc = {
     },
     events: {
         notification: { schema: notificationEvent },
-        openPanel: { schema: z.object({}) },
+        // Scoped to the session that invoked /dcp so other open sessions don't
+        // pop their panels when a command runs elsewhere.
+        openPanel: { schema: z.object({ sessionID: z.string() }) },
     },
 } as const

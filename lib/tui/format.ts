@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 export function formatDuration(ms: number): string {
     const safeMs = Math.max(0, Math.round(ms))
     if (safeMs < 1000) return `${safeMs} ms`

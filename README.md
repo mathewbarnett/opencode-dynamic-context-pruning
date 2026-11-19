@@ -51,6 +51,12 @@ Copy [`dcp.example.jsonc`](dcp.example.jsonc) to one of those paths to customize
 options is documented in [`dcp.schema.json`](dcp.schema.json). Protected-tool lists are additive
 across layers.
 
+`dcp.jsonc` is read once when the plugin loads — reload OpenCode (or restart the plugin) to apply
+edits. Project config resolution walks up from the working directory to the nearest `.opencode`
+directory, so a nested project can inherit a parent's `dcp.jsonc`. Unknown keys, type errors and
+malformed JSONC are reported as toasts at load time, and a malformed file is ignored rather than
+partially applied.
+
 Notable settings:
 
 | Setting                            | Default      | Meaning                                                                 |
@@ -68,7 +74,11 @@ Notable settings:
 ## Notifications
 
 Notifications are delivered as toasts. The V1 option `pruneNotificationType` has been removed;
-there is no invisible in-session notification under OpenCode 2's public plugin API.
+there is no invisible in-session notification under OpenCode 2's public plugin API. The V1
+`autoUpdate` option was also removed — updates are managed by OpenCode's plugin installer.
+
+Opening the panel with bare `/dcp` is scoped to the session that invoked it; other open sessions
+are left alone.
 
 ## Limitations
 
@@ -80,6 +90,32 @@ there is no invisible in-session notification under OpenCode 2's public plugin A
   startup are detected on the next request.
 - `permission: "ask"` uses OpenCode's native permission prompt; it requires an interactive session
   to approve.
+- Token counts used for nudge thresholds and context reports come from an Anthropic tokenizer for
+  every provider. Treat them as approximations for non-Anthropic models; reported session usage
+  from the host is used directly where available.
+- Debug logging (`"debug": true`) writes full message and tool text to
+  `~/.config/opencode/logs/dcp/context/<session>/`. Snapshots are capped at 10 per session, but
+  they can contain sensitive data — avoid enabling it in shared environments.
+
+## Compatibility
+
+| OpenCode | Status                         |
+| -------- | ------------------------------ |
+| 2.3.x+   | Supported (native plugin APIs) |
+| 2.0–2.2  | Not tested                     |
+| 1.x      | Not supported                  |
+
+This fork deliberately diverges from the upstream/commercial continuation: it targets OpenCode 2
+natively, drops the V1 adapter and npm auto-update, and stays AGPL-3.0-or-later. See
+[`CHANGELOG.md`](CHANGELOG.md) and [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+## Local data
+
+- Pruning state: `$XDG_DATA_HOME/opencode/storage/plugin/dcp/<session>.json` (default
+  `~/.local/share/opencode/...`).
+- Debug logs and context snapshots: `$XDG_CONFIG_HOME/opencode/logs/dcp/` (default
+  `~/.config/opencode/...`).
+- The plugin does not transmit data anywhere itself.
 
 ## Development
 
@@ -96,5 +132,5 @@ for the diagnostic CLI tooling.
 
 ## License
 
-AGPL-3.0-or-later. See [LICENSE](LICENSE). Upstream attribution to Tarquinen/opencode-dynamic-context-pruning
-is retained.
+AGPL-3.0-or-later. See [LICENSE](LICENSE) and [NOTICE](NOTICE). Upstream attribution to
+Tarquinen/opencode-dynamic-context-pruning is retained.

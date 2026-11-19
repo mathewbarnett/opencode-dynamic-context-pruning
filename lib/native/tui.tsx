@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /** @jsxImportSource @opentui/solid */
 import type { Plugin } from "@opencode/plugin/tui"
 import { ContextDialog, PanelDialog, StatsDialog, StatusDialog } from "../tui/dialogs"
@@ -94,7 +95,13 @@ export async function setup(ctx: Plugin.Context) {
         },
     })
     const unsubscribeNotification = client.events.on("notification", onNotification)
-    const unsubscribeOpenPanel = client.events.on("openPanel", () => open())
+    const unsubscribeOpenPanel = client.events.on("openPanel", ({ data }) => {
+        const route = ctx.ui.router.current()
+        // The event is broadcast to every TUI session; only the session that
+        // invoked /dcp should actually pop its panel.
+        if (route.type !== "session" || route.sessionID !== data.sessionID) return
+        void open()
+    })
 
     ctx.ui.slot({
         append: "app",

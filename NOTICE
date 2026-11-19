@@ -1,0 +1,13 @@
+Dynamic Context Pruning (OpenCode 2)
+Copyright (C) 2026 mbarnett
+
+This project is a fork of Tarquinen/opencode-dynamic-context-pruning
+(https://github.com/Tarquinen/opencode-dynamic-context-pruning), which is licensed under the
+GNU Affero General Public License, version 3 or later.
+
+This fork replaces the upstream OpenCode 1 compatibility layer with native OpenCode 2 plugin
+APIs. Source files carry `SPDX-License-Identifier: AGPL-3.0-or-later`; see CHANGELOG.md for a
+summary of changes. No code from the upstream author's commercial successor is included.
+
+Licensed under the GNU Affero General Public License, version 3 or later. See LICENSE for the
+full license text.

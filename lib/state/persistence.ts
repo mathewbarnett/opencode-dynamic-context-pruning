@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * State persistence module for DCP plugin.
  * Persists pruned tool IDs across sessions so they survive OpenCode restarts.

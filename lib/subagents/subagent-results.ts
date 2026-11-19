@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { WithParts } from "../state"
 
 const SUB_AGENT_RESULT_BLOCK_REGEX =

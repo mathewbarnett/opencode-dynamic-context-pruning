@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * Minimal JSON Schema builders for DCP's tool definitions.
  *

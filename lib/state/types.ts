@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { CompressionTimingState } from "../compress/timing"
 import type { IdFormat } from "../message-ids"
 import type { MessageInfo, PartLike } from "../message-info"

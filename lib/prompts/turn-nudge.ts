@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 export const TURN_NUDGE = `<dcp-system-reminder>
 Evaluate the conversation for compressible ranges.
 

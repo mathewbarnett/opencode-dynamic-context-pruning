@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * DCP Help command handler.
  * Shows available DCP commands and their descriptions.
