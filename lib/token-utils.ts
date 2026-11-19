@@ -1,5 +1,5 @@
 import { SessionState, WithParts } from "./state"
-import { AssistantMessage, UserMessage } from "@opencode-ai/sdk/v2"
+import type { MessageInfo } from "./message-info"
 import { Logger } from "./logger"
 import * as _anthropicTokenizer from "@anthropic-ai/tokenizer"
 const anthropicCountTokens = (_anthropicTokenizer.countTokens ??
@@ -13,7 +13,7 @@ export function getCurrentTokenUsage(state: SessionState, messages: WithParts[])
             continue
         }
 
-        const assistantInfo = msg.info as AssistantMessage
+        const assistantInfo = msg.info as MessageInfo
         if ((assistantInfo.tokens?.output || 0) <= 0) {
             continue
         }
@@ -57,8 +57,8 @@ export function getCurrentParams(
             variant: undefined,
         }
     }
-    const userInfo = userMsg.info as UserMessage
-    const agent: string = userInfo.agent
+    const userInfo = userMsg.info as MessageInfo
+    const agent = userInfo.agent
     const providerId: string | undefined = userInfo.model.providerID
     const modelId: string | undefined = userInfo.model.modelID
     const variant: string | undefined = userInfo.model.variant

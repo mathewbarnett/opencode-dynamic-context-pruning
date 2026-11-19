@@ -23,7 +23,6 @@ function buildConfig(permission: "allow" | "ask" | "deny" = "allow"): PluginConf
         enabled: true,
         debug: false,
         pruneNotification: "off",
-        pruneNotificationType: "chat",
         commands: {
             enabled: true,
             protectedTools: [],

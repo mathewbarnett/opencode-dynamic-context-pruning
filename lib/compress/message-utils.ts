@@ -160,10 +160,6 @@ export function resolveMessages(
 
     for (const entry of args.content) {
         const normalizedMessageId = entry.messageId.trim()
-        if (seenMessageIds.has(normalizedMessageId)) {
-            issues.push({ kind: "duplicate", messageId: normalizedMessageId })
-            continue
-        }
 
         try {
             const plan = resolveMessage(
@@ -175,6 +171,14 @@ export function resolveMessages(
                 state,
                 config,
             )
+            // The canonical ref may differ from the trimmed input (parseBoundaryId
+            // lowercases refs), so dedupe on the canonical form — not the raw text.
+            // Otherwise "M0001" and "m0001" both pass the check and produce two
+            // blocks for one message, silently losing one summary.
+            if (seenMessageIds.has(plan.entry.messageId)) {
+                issues.push({ kind: "duplicate", messageId: plan.entry.messageId })
+                continue
+            }
             seenMessageIds.add(plan.entry.messageId)
             plans.push(plan)
         } catch (error: any) {

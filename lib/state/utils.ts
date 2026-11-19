@@ -342,4 +342,16 @@ export function resetOnCompaction(state: SessionState): void {
         turnNudgeAnchors: new Set<string>(),
         iterationNudgeAnchors: new Set<string>(),
     }
+    // These are all keyed to pre-compaction IDs/tokens and become stale after
+    // compaction. Leaving them in place causes wrong turn ages, prune decisions,
+    // and nudge thresholds in the new context window.
+    state.compressionTiming.startsByCallId.clear()
+    state.compressionTiming.pendingByCallId.clear()
+    state.subAgentResultCache.clear()
+    state.toolIdList = []
+    state.stats = { pruneTokenCounter: 0, totalPruneTokens: 0 }
+    state.manualMode = false
+    state.pendingManualTrigger = null
+    state.modelContextLimit = undefined
+    state.systemPromptTokens = undefined
 }

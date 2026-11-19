@@ -35,7 +35,6 @@ export function appendProtectedUserMessages(
         for (const part of parts) {
             if (part.type === "text" && typeof part.text === "string" && part.text.trim()) {
                 userTexts.push(part.text)
-                break
             }
         }
     }
@@ -187,7 +186,20 @@ export async function appendProtectedTools(
                     }
 
                     if (output) {
-                        protectedOutputs.push(`\n### ${title}\n${output}`)
+                        // Preserve the tool input alongside the output so the exact
+                        // change/command is kept, not just its result.
+                        let inputText = ""
+                        if (part.state?.input !== undefined) {
+                            inputText =
+                                typeof part.state.input === "string"
+                                    ? part.state.input
+                                    : JSON.stringify(part.state.input)
+                        }
+                        protectedOutputs.push(
+                            `\n### ${title}${
+                                inputText ? `\nInput:\n${inputText}` : ""
+                            }\nOutput:\n${output}`,
+                        )
                     }
                 }
             }

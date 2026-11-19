@@ -16,11 +16,6 @@
             "default": true,
             "description": "Enable or disable the DCP plugin"
         },
-        "autoUpdate": {
-            "type": "boolean",
-            "default": true,
-            "description": "Automatically update npm-installed DCP when a newer npm latest version is available. Version-locked plugin specs are not updated."
-        },
         "debug": {
             "type": "boolean",
             "default": false,
@@ -31,12 +26,6 @@
             "enum": ["off", "minimal", "detailed"],
             "default": "detailed",
             "description": "Level of notification shown when context management occurs"
-        },
-        "pruneNotificationType": {
-            "type": "string",
-            "enum": ["chat", "toast"],
-            "default": "chat",
-            "description": "Where to display notifications (chat message or toast notification)"
         },
         "commands": {
             "type": "object",

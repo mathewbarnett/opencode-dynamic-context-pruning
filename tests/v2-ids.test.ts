@@ -241,7 +241,7 @@ test("V2 prompt defaults, schemas and reloads all describe compact IDs", () => {
         const { tool } = fixture(mode)
         assert.match(tool.description, /@4@/)
         assert.doesNotMatch(tool.description, /mNNNN|m000\d|dcp-message-id|XML/)
-        const schema = tool.args.content.element.shape
+        const schema = tool.args.properties.content.items.properties
         assert.match((mode === "range" ? schema.startId : schema.messageId).description, /@1@/)
     }
     const overrides = join(process.env.OPENCODE_CONFIG_DIR!, "dcp-prompts", "overrides")

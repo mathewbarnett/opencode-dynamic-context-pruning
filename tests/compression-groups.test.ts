@@ -25,7 +25,6 @@ function buildConfig(mode: "message" | "range"): PluginConfig {
         enabled: true,
         debug: false,
         pruneNotification: "off",
-        pruneNotificationType: "chat",
         commands: {
             enabled: true,
             protectedTools: [],
@@ -177,10 +176,8 @@ test("compression notifications increment by tool call across range and message 
 
     const rangeConfig = buildConfig("range")
     rangeConfig.pruneNotification = "detailed"
-    rangeConfig.pruneNotificationType = "toast"
     const messageConfig = buildConfig("message")
     messageConfig.pruneNotification = "detailed"
-    messageConfig.pruneNotificationType = "toast"
 
     const rangeTool = createCompressRangeTool({
         client,

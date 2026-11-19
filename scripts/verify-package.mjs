@@ -16,9 +16,10 @@ const builtinNames = new Set([
 const requiredRepoFiles = [
     "dist/index.js",
     "dist/index.d.ts",
+    "dist/tui.js",
     "dist/tui.d.ts",
-    "tui.tsx",
-    "server.js",
+    "dcp.schema.json",
+    "dcp.example.jsonc",
     "README.md",
     "LICENSE",
 ]
@@ -27,16 +28,20 @@ const requiredTarballFiles = [
     "package.json",
     "dist/index.js",
     "dist/index.d.ts",
+    "dist/tui.js",
     "dist/tui.d.ts",
-    "tui.tsx",
-    "server.js",
+    "dcp.schema.json",
+    "dcp.example.jsonc",
     "README.md",
     "LICENSE",
 ]
 
 const forbiddenTarballPatterns = [
     /^node_modules\//,
+    /^lib\//, // TUI and plugin are bundled; raw TS source must not ship
     /^index\.ts$/,
+    /^tui\.tsx$/,
+    /^server\.js$/,
     /^tests\//,
     /^scripts\//,
     /^docs\//,
@@ -45,6 +50,7 @@ const forbiddenTarballPatterns = [
     /^\.github\//,
     /^package-lock\.json$/,
     /^tsconfig\.json$/,
+    /^tsup\.config\.ts$/,
 ]
 
 const packageInfoCache = new Map()
@@ -73,37 +79,59 @@ function assertPackageJsonShape() {
         fail("expected package.json exports['.'].import to be './dist/index.js'")
     }
 
-    if (pkg.exports?.["./server"]?.import !== "./dist/index.js") {
-        fail("expected package.json exports['./server'].import to be './dist/index.js'")
+    if (pkg.exports?.["./server"] !== undefined) {
+        fail("package.json must not export './server' (the V1 server path was removed)")
     }
 
-    if (pkg.exports?.["./tui"]?.import !== "./tui.tsx") {
-        fail("expected package.json exports['./tui'].import to be './tui.tsx'")
+    if (pkg.exports?.["./tui"]?.import !== "./dist/tui.js") {
+        fail("expected package.json exports['./tui'].import to be './dist/tui.js'")
     }
 
     const files = Array.isArray(pkg.files) ? pkg.files : []
-    for (const entry of ["dist/", "lib/", "tui.tsx", "README.md", "LICENSE"]) {
+    for (const entry of ["dist/", "dcp.schema.json", "dcp.example.jsonc", "README.md", "LICENSE"]) {
         if (!files.includes(entry)) {
             fail(`package.json files must include ${entry}`)
+        }
+    }
+    for (const forbidden of ["lib/", "tui.tsx", "server.js"]) {
+        if (files.includes(forbidden)) {
+            fail(`package.json files must not include ${forbidden} (bundled output ships instead)`)
         }
     }
 }
 
 function getImportStatements(source) {
-    const pattern = /^\s*import\s+([^\n;]+?)\s+from\s+["']([^"']+)["']/gm
-    return Array.from(source.matchAll(pattern), (match) => ({
-        clause: match[1].trim(),
-        specifier: match[2],
-    }))
+    const entries = []
+    // Static imports (including multiline and side-effect/namespace forms).
+    const staticPattern = /\bimport\s+([\s\S]*?)\s+from\s*["']([^"']+)["']/g
+    for (const match of source.matchAll(staticPattern)) {
+        entries.push({ clause: match[1].trim(), specifier: match[2] })
+    }
+    // Side-effect imports: import "pkg"
+    const sideEffectPattern = /\bimport\s*["']([^"']+)["']/g
+    for (const match of source.matchAll(sideEffectPattern)) {
+        entries.push({ clause: "", specifier: match[1] })
+    }
+    // Dynamic imports: import("pkg")
+    const dynamicPattern = /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g
+    for (const match of source.matchAll(dynamicPattern)) {
+        entries.push({ clause: "*", specifier: match[1] })
+    }
+    return entries
 }
 
 function getImportKind(clause) {
-    if (clause.startsWith("type ")) return "type"
+    if (clause === "") return "side-effect"
+    if (clause === "*") return "dynamic"
+    if (clause.startsWith("type ") || /\btype\s*\{/.test(clause)) return "type"
     if (clause.startsWith("* as ")) return "namespace"
     if (clause.startsWith("{")) return "named"
     if (clause.includes(",")) {
         const [, trailing = ""] = clause.split(",", 2)
-        return trailing.trim().startsWith("* as ") ? "default+namespace" : "default+named"
+        const trailingTrimmed = trailing.trim()
+        if (trailingTrimmed.startsWith("* as ")) return "default+namespace"
+        if (trailingTrimmed.startsWith("type ")) return "default+named"
+        return "default+named"
     }
     return "default"
 }
@@ -172,11 +200,29 @@ function packageLooksCommonJs(pkg) {
     if (!pkg) return false
     if (pkg.type === "commonjs") return true
 
+    // A package with an explicit ESM export condition is importable even when
+    // its legacy `main` points at a CJS bundle (e.g. zod, @anthropic-ai/*).
+    const rootExport = pkg.exports?.["."]
+    if (typeof rootExport === "string") return rootExport.endsWith(".cjs")
+    if (rootExport && typeof rootExport === "object" && rootExport.import) return false
+
+    // A non-CJS `module` field points at an ESM build (e.g. jsonc-parser), so
+    // named ESM imports resolve even when the legacy `main` is a UMD bundle.
+    const moduleEntry = typeof pkg.module === "string" ? pkg.module : ""
+    if (moduleEntry.endsWith(".mjs") || moduleEntry.endsWith(".js")) return false
+
     const main = typeof pkg.main === "string" ? pkg.main : ""
     return /(?:^|\/)(cjs|umd)(?:\/|$)/.test(main) || main.endsWith(".cjs")
 }
 
 function validateRuntimeImportGraph() {
+    const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"))
+    const declared = new Set([
+        ...Object.keys(pkg.dependencies ?? {}),
+        ...Object.keys(pkg.peerDependencies ?? {}),
+    ])
+    const devDeclared = new Set(Object.keys(pkg.devDependencies ?? {}))
+
     const pending = [path.join(root, "index.ts"), path.join(root, "tui.tsx")]
     const seen = new Set()
 
@@ -192,18 +238,29 @@ function validateRuntimeImportGraph() {
                 continue
             }
 
-            if (entry.specifier === "jsonc-parser/lib/esm/main.js") {
-                continue
-            }
-
             const packageName = getPackageName(entry.specifier)
             if (builtinNames.has(packageName)) continue
 
             const kind = getImportKind(entry.clause)
-            if (kind === "type" || kind === "namespace") continue
+            if (kind === "type") continue
 
-            const pkg = findPackageInfo(packageName, filePath)
-            if (packageLooksCommonJs(pkg)) {
+            // Every runtime import must be declared as a production dependency;
+            // type-only imports may live in devDependencies.
+            if (!declared.has(packageName)) {
+                if (devDeclared.has(packageName) && kind !== "type") {
+                    fail(
+                        `${path.relative(root, filePath)} has a runtime ${kind} import from devDependency ${packageName}`,
+                    )
+                }
+                fail(`${path.relative(root, filePath)} imports undeclared package ${packageName}`)
+            }
+
+            // Namespace/dynamic imports of CJS packages are safe (the namespace
+            // object is the CJS exports); named/default imports are not.
+            if (kind === "namespace" || kind === "dynamic" || kind === "side-effect") continue
+
+            const importedPkg = findPackageInfo(packageName, filePath)
+            if (packageLooksCommonJs(importedPkg)) {
                 fail(
                     `${path.relative(root, filePath)} uses ${kind} import from CommonJS-style package ${packageName}`,
                 )
@@ -236,6 +293,29 @@ function validatePackedFiles() {
     )
     if (forbidden) {
         fail(`packed tarball contains forbidden path ${forbidden}`)
+    }
+
+    // The TUI must be fully bundled: every relative import reachable from
+    // dist/tui.js must exist in the tarball so no host-side transpilation of
+    // raw source is required.
+    const pendingTui = ["dist/tui.js"]
+    const seenTui = new Set()
+    while (pendingTui.length > 0) {
+        const current = pendingTui.pop()
+        if (seenTui.has(current)) continue
+        seenTui.add(current)
+        if (!packedPaths.includes(current)) {
+            fail(`packed tarball is missing TUI bundle chunk ${current}`)
+        }
+        const source = readFileSync(path.join(root, current), "utf8")
+        for (const entry of getImportStatements(source)) {
+            if (!entry.specifier.startsWith(".")) continue
+            const resolved = path
+                .normalize(path.join(path.dirname(current), entry.specifier))
+                .split(path.sep)
+                .join("/")
+            pendingTui.push(resolved)
+        }
     }
 
     console.log(`package verification passed for ${result.name}@${result.version}`)

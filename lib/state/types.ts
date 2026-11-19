@@ -1,10 +1,10 @@
 import type { CompressionTimingState } from "../compress/timing"
 import type { IdFormat } from "../message-ids"
-import { Message, Part } from "@opencode-ai/sdk/v2"
+import type { MessageInfo, PartLike } from "../message-info"
 
 export interface WithParts {
-    info: Message
-    parts: Part[]
+    info: MessageInfo
+    parts: PartLike[]
 }
 
 export type ToolStatus = "pending" | "running" | "completed" | "error"

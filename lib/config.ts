@@ -1,10 +1,9 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from "fs"
+import { readFileSync, existsSync, statSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"
-import { parse } from "jsonc-parser/lib/esm/main.js"
-import type { PluginInput } from "@opencode-ai/plugin"
-
-type ConfigContext = Pick<PluginInput, "directory"> & {
+import { parse } from "jsonc-parser"
+type ConfigContext = {
+    directory: string
     client: {
         tui: {
             showToast(input: {
@@ -67,10 +66,8 @@ export interface ExperimentalConfig {
 
 export interface PluginConfig {
     enabled: boolean
-    autoUpdate: boolean
     debug: boolean
     pruneNotification: "off" | "minimal" | "detailed"
-    pruneNotificationType: "chat" | "toast"
     commands: Commands
     manualMode: ManualModeConfig
     turnProtection: TurnProtection
@@ -103,11 +100,8 @@ const COMPRESS_DEFAULT_PROTECTED_TOOLS = ["task", "skill", "todowrite", "todorea
 export const VALID_CONFIG_KEYS = new Set([
     "$schema",
     "enabled",
-    "autoUpdate",
     "debug",
-    "showUpdateToasts",
     "pruneNotification",
-    "pruneNotificationType",
     "turnProtection",
     "turnProtection.enabled",
     "turnProtection.turns",
@@ -182,10 +176,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
         errors.push({ key: "enabled", expected: "boolean", actual: typeof config.enabled })
     }
 
-    if (config.autoUpdate !== undefined && typeof config.autoUpdate !== "boolean") {
-        errors.push({ key: "autoUpdate", expected: "boolean", actual: typeof config.autoUpdate })
-    }
-
     if (config.debug !== undefined && typeof config.debug !== "boolean") {
         errors.push({ key: "debug", expected: "boolean", actual: typeof config.debug })
     }
@@ -197,17 +187,6 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 key: "pruneNotification",
                 expected: '"off" | "minimal" | "detailed"',
                 actual: JSON.stringify(config.pruneNotification),
-            })
-        }
-    }
-
-    if (config.pruneNotificationType !== undefined) {
-        const validValues = ["chat", "toast"]
-        if (!validValues.includes(config.pruneNotificationType)) {
-            errors.push({
-                key: "pruneNotificationType",
-                expected: '"chat" | "toast"',
-                actual: JSON.stringify(config.pruneNotificationType),
             })
         }
     }
@@ -469,8 +448,9 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 value: unknown,
                 actualValue: unknown = value,
             ): void => {
-                const isValidNumber = typeof value === "number"
-                const isPercentString = typeof value === "string" && value.endsWith("%")
+                const isValidNumber =
+                    typeof value === "number" && Number.isFinite(value) && value >= 0
+                const isPercentString = typeof value === "string" && /^\d+(?:\.\d+)?%$/.test(value)
 
                 if (!isValidNumber && !isPercentString) {
                     errors.push({
@@ -499,7 +479,8 @@ export function validateConfigTypes(config: Record<string, any>): ValidationErro
                 }
 
                 for (const [providerModelKey, limit] of Object.entries(limits)) {
-                    const isValidNumber = typeof limit === "number"
+                    const isValidNumber =
+                        typeof limit === "number" && Number.isFinite(limit) && limit >= 0
                     const isPercentString =
                         typeof limit === "string" && /^\d+(?:\.\d+)?%$/.test(limit)
                     if (!isValidNumber && !isPercentString) {
@@ -665,10 +646,8 @@ function showConfigWarnings(
 
 const defaultConfig: PluginConfig = {
     enabled: true,
-    autoUpdate: true,
     debug: false,
     pruneNotification: "detailed",
-    pruneNotificationType: "chat",
     commands: {
         enabled: true,
         protectedTools: [...DEFAULT_PROTECTED_TOOLS],
@@ -773,18 +752,6 @@ function getConfigPaths(ctx?: ConfigContext): {
     }
 
     return { global, configDir, project }
-}
-
-function createDefaultConfig(): void {
-    if (!existsSync(GLOBAL_CONFIG_DIR)) {
-        mkdirSync(GLOBAL_CONFIG_DIR, { recursive: true })
-    }
-
-    const configContent = `{
-  "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json"
-}
-`
-    writeFileSync(GLOBAL_CONFIG_PATH_JSONC, configContent, "utf-8")
 }
 
 interface ConfigLoadResult {
@@ -942,10 +909,8 @@ function deepCloneConfig(config: PluginConfig): PluginConfig {
 function mergeLayer(config: PluginConfig, data: Record<string, any>): PluginConfig {
     return {
         enabled: data.enabled ?? config.enabled,
-        autoUpdate: data.autoUpdate ?? config.autoUpdate,
         debug: data.debug ?? config.debug,
         pruneNotification: data.pruneNotification ?? config.pruneNotification,
-        pruneNotificationType: data.pruneNotificationType ?? config.pruneNotificationType,
         commands: mergeCommands(config.commands, data.commands as any),
         manualMode: mergeManualMode(config.manualMode, data.manualMode as any),
         turnProtection: {
@@ -979,10 +944,6 @@ function scheduleParseWarning(ctx: ConfigContext, title: string, message: string
 export function getConfig(ctx: ConfigContext): PluginConfig {
     let config = deepCloneConfig(defaultConfig)
     const configPaths = getConfigPaths(ctx)
-
-    if (!configPaths.global) {
-        createDefaultConfig()
-    }
 
     const layers: Array<{ path: string | null; name: string; isProject: boolean }> = [
         { path: configPaths.global, name: "config", isProject: false },

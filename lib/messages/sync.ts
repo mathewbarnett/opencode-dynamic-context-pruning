@@ -33,23 +33,9 @@ export const syncCompressionBlocks = (
     messagesState.activeByAnchorMessageId.clear()
 
     const now = Date.now()
-    const missingOriginBlockIds: number[] = []
     const orderedBlocks = Array.from(messagesState.blocksById.values()).sort(sortBlocksByCreation)
 
     for (const block of orderedBlocks) {
-        const hasOriginMessage =
-            typeof block.compressMessageId === "string" &&
-            block.compressMessageId.length > 0 &&
-            messageIds.has(block.compressMessageId)
-
-        if (!hasOriginMessage) {
-            block.active = false
-            block.deactivatedAt = now
-            block.deactivatedByBlockId = undefined
-            missingOriginBlockIds.push(block.blockId)
-            continue
-        }
-
         if (block.deactivatedByUser) {
             block.active = false
             if (block.deactivatedAt === undefined) {
@@ -58,6 +44,11 @@ export const syncCompressionBlocks = (
             block.deactivatedByBlockId = undefined
             continue
         }
+
+        // Liveness is driven by explicit deactivation flags (user / consumed-by),
+        // not by which messages happen to be in the current window. Previously a
+        // block was deactivated whenever its compress-call origin aged out, which
+        // un-pruned the original messages while dropping the summary.
 
         for (const consumedBlockId of block.consumedBlockIds) {
             if (!messagesState.activeBlockIds.has(consumedBlockId)) {
@@ -87,6 +78,15 @@ export const syncCompressionBlocks = (
         messagesState.activeBlockIds.add(block.blockId)
         if (messageIds.has(block.anchorMessageId)) {
             messagesState.activeByAnchorMessageId.set(block.anchorMessageId, block.blockId)
+        } else {
+            // The anchor left the window: keep the summary in context by attaching
+            // it to the first still-present message that has no summary yet.
+            const fallback = messages.find(
+                (msg) => !messagesState.activeByAnchorMessageId.has(msg.info.id),
+            )
+            if (fallback) {
+                messagesState.activeByAnchorMessageId.set(fallback.info.id, block.blockId)
+            }
         }
     }
 
@@ -114,9 +114,8 @@ export const syncCompressionBlocks = (
         }
     }
 
-    if (missingOriginBlockIds.length > 0 || deactivatedCount > 0 || reactivatedCount > 0) {
+    if (deactivatedCount > 0 || reactivatedCount > 0) {
         logger.info("Synced compress block state", {
-            missingOriginCount: missingOriginBlockIds.length,
             deactivatedCount,
             reactivatedCount,
         })

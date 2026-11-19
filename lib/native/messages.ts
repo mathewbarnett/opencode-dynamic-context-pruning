@@ -1,33 +1,49 @@
-import type { Message, ContentPart, ToolResultPart } from "@opencode/ai/schema/messages"
+import type { Message, ContentPart, ToolResultPart } from "@opencode/ai"
 import type { Plugin } from "@opencode/plugin"
 import type { WithParts } from "../state"
 
 type History = Awaited<ReturnType<Plugin.Context["session"]["context"]>>
 type Session = Awaited<ReturnType<Plugin.Context["session"]["get"]>>
+type Entry = History[number]
 type Part = WithParts["parts"][number]
 
-const emptyUsage = { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }
-
-function info(id: string, role: string, session: Session, entry?: History[number]) {
-    const model = entry?.type === "assistant" ? entry.model : session.model
+/**
+ * Build engine metadata from a real stored session entry. Returns undefined when
+ * the entry is missing or lacks the fields the shared engine requires. We never
+ * synthesize timestamps, token counts, model identity, or message IDs here:
+ * fabricated values previously fed compaction detection and nudge thresholds
+ * with data that did not exist in the session.
+ */
+function info(
+    entry: Entry | undefined,
+    session: Session,
+    role: string,
+): WithParts["info"] | undefined {
+    if (!entry || typeof entry.time?.created !== "number") return undefined
+    const model = entry.type === "assistant" ? entry.model : session.model
     return {
-        id,
+        id: entry.id,
         role,
         sessionID: session.id,
-        time: { created: entry?.time.created ?? 0 },
-        agent: entry?.type === "assistant" ? entry.agent : session.agent,
-        model: { providerID: model?.providerID, modelID: model?.id, variant: model?.variant },
+        time: { created: entry.time.created },
+        agent: entry.type === "assistant" ? entry.agent : session.agent,
+        model: model
+            ? { providerID: model.providerID, modelID: model.id, variant: model.variant }
+            : undefined,
         providerID: model?.providerID,
         modelID: model?.id,
-        tokens: entry?.type === "assistant" ? (entry.tokens ?? emptyUsage) : emptyUsage,
-        summary: entry?.type === "compaction" && entry.status === "completed",
+        tokens: entry.type === "assistant" ? entry.tokens : undefined,
+        summary: entry.type === "compaction" && entry.status === "completed",
     } as unknown as WithParts["info"]
 }
 
-// Bookkeeping projections are never sent to a provider. Native messages remain
-// authoritative for reasoning, media, checkpoints, and provider metadata.
+/** Project stored entries into the engine's working shape for the compress tool. */
 export function history(entries: History, session: Session): WithParts[] {
     return entries.flatMap((entry): WithParts[] => {
+        const role =
+            entry.type === "assistant" || entry.type === "compaction" ? "assistant" : "user"
+        const meta = info(entry, session, role)
+        if (!meta) return []
         const base = { sessionID: session.id, messageID: entry.id }
         if (entry.type === "assistant") {
             const parts = entry.content.map((part, index) => {
@@ -49,7 +65,7 @@ export function history(entries: History, session: Session): WithParts[] {
             })
             return [
                 {
-                    info: info(entry.id, "assistant", session, entry),
+                    info: meta,
                     parts: [{ ...base, id: `${entry.id}:step`, type: "step-start" }, ...parts],
                 } as WithParts,
             ]
@@ -67,17 +83,15 @@ export function history(entries: History, session: Session): WithParts[] {
             text = `The working directory has been changed to ${entry.location.directory}.`
         if (entry.type === "shell" && entry.metadata?.background !== true)
             text = `The following shell command was executed by the user:\n\nCommand:\n${entry.command}\n\nOutput:\n${entry.output?.output ?? ""}`
-        if (text !== undefined) {
+        if (text !== undefined)
             return [
                 {
-                    info: info(entry.id, "user", session, entry),
+                    info: meta,
                     parts: [{ ...base, id: `${entry.id}:text`, type: "text", text }],
                 } as WithParts,
             ]
-        }
-        if (entry.type === "compaction" && entry.status === "completed") {
-            return [{ info: info(entry.id, "assistant", session, entry), parts: [] } as WithParts]
-        }
+        if (entry.type === "compaction" && entry.status === "completed")
+            return [{ info: meta, parts: [] } as WithParts]
         return []
     })
 }
@@ -88,7 +102,12 @@ function output(content: ReadonlyArray<{ type: string; text?: string }>): unknow
         : structuredClone(content)
 }
 
-export function project(native: Message[], entries: History, session: Session) {
+/**
+ * Build an editable view of the native provider messages. Every field on the
+ * view comes from a real stored entry; messages without one are left untouched
+ * (they are passed through verbatim by commit()).
+ */
+export function view(native: Message[], entries: History, session: Session) {
     const byID = new Map(entries.map((entry) => [entry.id, entry]))
     const results = new Map<string, ToolResultPart>()
     const owners = new Map<string, string>()
@@ -104,6 +123,8 @@ export function project(native: Message[], entries: History, session: Session) {
         if (!message.id || !["user", "assistant"].includes(message.role)) continue
         const entry = byID.get(message.id)
         if (!entry || entry.type === "compaction") continue
+        const meta = info(entry, session, message.role)
+        if (!meta) continue
         const base = { sessionID: session.id, messageID: message.id }
         const parts: Part[] = []
         if (message.role === "assistant")
@@ -112,19 +133,27 @@ export function project(native: Message[], entries: History, session: Session) {
             let projected: Part | undefined
             if (part.type === "text")
                 projected = { ...base, id: `${message.id}:${index}`, type: "text", text: part.text }
-            if (part.type === "media")
+            if (part.type === "media") {
+                const legacy = part as typeof part & {
+                    mediaType?: string
+                    data?: string | Uint8Array
+                }
+                const asset = part.media
                 projected = {
                     ...base,
                     id: `${message.id}:${index}`,
                     type: "file",
-                    mime: part.mediaType,
-                    url: typeof part.data === "string" ? part.data : "",
+                    mime: asset?.mediaType ?? legacy.mediaType ?? "application/octet-stream",
+                    url:
+                        asset?.inline()?.dataUrl ??
+                        (asset?.source.type === "url" ? asset.source.url : "") ??
+                        (typeof legacy.data === "string" ? legacy.data : ""),
                 }
+            }
             if (part.type === "tool-call") {
                 const result = results.get(part.id)
-                const entry = byID.get(message.id)
                 const durable =
-                    entry?.type === "assistant"
+                    entry.type === "assistant"
                         ? entry.content.find((item) => item.type === "tool" && item.id === part.id)
                         : undefined
                 projected = {
@@ -162,15 +191,13 @@ export function project(native: Message[], entries: History, session: Session) {
                 links.set(part, projected)
             }
         }
-        const projected = {
-            info: info(message.id, message.role, session, byID.get(message.id)),
-            parts,
-        } as WithParts
+        const projected = { info: meta, parts } as WithParts
         messages.push(projected)
         originals.set(message.id, projected)
     }
 
-    function restore(): Message[] {
+    /** Write engine edits back onto the native messages, preserving order. */
+    function commit(): Message[] {
         const retained = new Set(messages.map((message) => message.info.id))
         const linked = new Set(links.values())
         const output: Message[] = []
@@ -184,7 +211,7 @@ export function project(native: Message[], entries: History, session: Session) {
                     content: message.parts
                         .filter((part) => part.type === "text")
                         .map((part) => ({ type: "text", text: part.text })),
-                })
+                } as Message)
             }
         }
         for (const message of native) {
@@ -225,13 +252,12 @@ export function project(native: Message[], entries: History, session: Session) {
                 } else content.push(part)
             }
             content.push(...added)
-            if (content.length || message.content.length === 0) output.push({ ...message, content })
+            if (content.length || message.content.length === 0)
+                output.push({ ...message, content } as Message)
         }
         synthetic()
         return output
     }
-    // A native checkpoint can replace every user message. Summary construction
-    // still needs session/agent/model fields, without projecting that checkpoint.
-    const summaryBase: WithParts = { info: info("msg_dcp_base", "user", session), parts: [] }
-    return { messages, restore, summaryBase }
+
+    return { messages, commit }
 }

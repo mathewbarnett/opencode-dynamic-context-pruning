@@ -15,7 +15,6 @@ function buildConfig(manualMode = false): PluginConfig {
         enabled: true,
         debug: false,
         pruneNotification: "off",
-        pruneNotificationType: "chat",
         commands: { enabled: true, protectedTools: [] },
         manualMode: { enabled: manualMode, automaticStrategies: true },
         turnProtection: { enabled: false, turns: 4 },

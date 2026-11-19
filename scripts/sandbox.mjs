@@ -16,8 +16,6 @@ const { values } = parseArgs({
     options: {
         help: { type: "boolean", short: "h" },
         fresh: { type: "boolean" },
-        v1: { type: "boolean" },
-        v2: { type: "boolean" },
         opencode: { type: "string" },
         dcp: { type: "string" },
         model: { type: "string" },
@@ -34,22 +32,19 @@ Open isolated OpenCode with DCP and the bundled test logger.
 Sessions and scratch files persist. Local plugins are rebuilt on every launch.
 Each launch uses the latest stable release of the selected major version.
 
-  --v1                Use V1 over HTTP, with its own saved state
-  --v2                Use V2 (default), with its own saved state
   --fresh             Start a new empty sandbox; keep old ones
   --logs              Show the latest raw/readable log paths and capture counts
   --path              Print the current sandbox's host directory
-  --opencode VERSION  Use an exact version for this launch (V1 requires 1.18.29+)
-  --dcp VERSION       Use npm DCP (e.g. latest or 3.2.1); default: local checkout
+  --opencode VERSION  Use an exact OpenCode 2.x version for this launch
+  --dcp VERSION       Use npm DCP (e.g. latest); default: local checkout
   --model MODEL       Remember a provider/model (otherwise OpenCode selects one)
-  --transport TYPE    V2: websocket or http; V1: http only
+  --transport TYPE    websocket or http
 
 Examples:
   dcp-sandbox
-  dcp-sandbox --v1
   dcp-sandbox --dcp latest --fresh
-  dcp-sandbox --opencode 2.0.12 --dcp 3.2.1
-  dcp-sandbox --v1 --logs
+  dcp-sandbox --opencode 2.3.2 --dcp latest
+  dcp-sandbox --logs
   dcp-sandbox -- --continue
   dcp-sandbox -- run --format json "Reply with OK."
 
@@ -69,11 +64,8 @@ function save(path, value) {
 
 async function main() {
     process.umask(0o077)
-    if (values.v1 && values.v2) throw new Error("Choose --v1 or --v2, not both.")
-    const major = values.v1 ? 1 : values.v2 ? 2 : Number(values.opencode?.split(".")[0] || 2)
-    if (![1, 2].includes(major)) throw new Error("Choose an OpenCode 1.x or 2.x version.")
-    // Each major has independent sessions and settings.
-    const state = major === 1 ? join(root, "v1") : root
+    const major = 2
+    const state = root
     const stamp = new Date().toISOString().replace(/[:.]/g, "-")
     const current = join(state, "current.json")
     const profile = values.fresh ? stamp : json(current, "default")
@@ -101,10 +93,10 @@ async function main() {
     const saved = json(settingsPath, {})
     const settings = {
         model: values.model ?? saved.model,
-        transport: values.transport ?? saved.transport ?? (major === 1 ? "http" : undefined),
+        transport: values.transport ?? saved.transport,
     }
     const dcp = values.dcp ?? "local"
-    const packageName = major === 1 ? "opencode-ai" : "@opencode/cli"
+    const packageName = "@opencode/cli"
     let release = values.opencode
     if (!release) {
         const versions = JSON.parse(
@@ -116,26 +108,13 @@ async function main() {
     }
     const version = /^(1|2)\.(\d+)\.(\d+)(-[\w.-]+)?$/.exec(release)
     if (!version || Number(version[1]) !== major)
-        throw new Error(
-            `--opencode requires an exact ${major}.x version matching the selected host.`,
-        )
-    if (
-        major === 1 &&
-        (Number(version[2]) < 18 ||
-            (Number(version[2]) === 18 &&
-                (Number(version[3]) < 29 || (Number(version[3]) === 29 && version[4]))))
-    )
-        throw new Error("DCP's shared entrypoint requires OpenCode 1.18.29 or newer.")
+        throw new Error(`--opencode requires an exact ${major}.x version.`)
     if (settings.model && !/^[^/]+\/.+$/.test(settings.model))
         throw new Error("--model must use provider/model format.")
     if (settings.transport && !["websocket", "http"].includes(settings.transport))
         throw new Error("--transport must be websocket or http.")
-    if (major === 2 && settings.transport && !settings.model)
+    if (settings.transport && !settings.model)
         throw new Error("Select --model provider/model when overriding its transport.")
-    if (major === 1 && settings.transport !== "http")
-        throw new Error(
-            "The V1 sandbox uses HTTP so all requests can be logged. Use --transport http.",
-        )
 
     const input = join(state, "launches", stamp)
     mkdirSync(input, { recursive: true, mode: 0o700 })
@@ -169,7 +148,7 @@ async function main() {
         join(repo, "scripts/sandbox"),
     ])
     console.log(dcp === "local" ? "Building DCP and request logger…" : "Building request logger…")
-    if (!existsSync(join(repo, "node_modules"))) command("npm", ["ci", "--legacy-peer-deps"])
+    if (!existsSync(join(repo, "node_modules"))) command("npm", ["ci"])
     const packages = []
     const directories = [join(repo, "tests/logger")]
     if (dcp === "local") directories.unshift(repo)

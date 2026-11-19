@@ -115,23 +115,18 @@ export async function sendUnifiedNotification(
             ? buildMinimalMessage(state, reason)
             : buildDetailedMessage(state, reason, pruneToolIds, toolMetadata, workingDirectory)
 
-    if (config.pruneNotificationType === "toast") {
-        let toastMessage = truncateExtractedSection(message)
-        toastMessage =
-            config.pruneNotification === "minimal" ? toastMessage : truncateToastBody(toastMessage)
+    let toastMessage = truncateExtractedSection(message)
+    toastMessage =
+        config.pruneNotification === "minimal" ? toastMessage : truncateToastBody(toastMessage)
 
-        await client.tui.showToast({
-            body: {
-                title: "DCP: Compress Notification",
-                message: toastMessage,
-                variant: "info",
-                duration: 5000,
-            },
-        })
-        return true
-    }
-
-    await sendIgnoredMessage(client, sessionId, message, params, logger)
+    await client.tui.showToast({
+        body: {
+            title: "DCP: Compress Notification",
+            message: toastMessage,
+            variant: "info",
+            duration: 5000,
+        },
+    })
     return true
 }
 
@@ -276,32 +271,27 @@ export async function sendCompressNotification(
         }
     }
 
-    if (config.pruneNotificationType === "toast") {
-        let toastMessage = message
-        if (config.compress.showCompression) {
-            const truncatedSummary = truncateToastSummary(summary)
-            if (truncatedSummary !== summary) {
-                toastMessage = toastMessage.replace(
-                    `\n→ Compression (~${summaryTokensStr}): ${summary}`,
-                    `\n→ Compression (~${summaryTokensStr}): ${truncatedSummary}`,
-                )
-            }
+    let toastMessage = message
+    if (config.compress.showCompression) {
+        const truncatedSummary = truncateToastSummary(summary)
+        if (truncatedSummary !== summary) {
+            toastMessage = toastMessage.replace(
+                `\n→ Compression (~${summaryTokensStr}): ${summary}`,
+                `\n→ Compression (~${summaryTokensStr}): ${truncatedSummary}`,
+            )
         }
-        toastMessage =
-            config.pruneNotification === "minimal" ? toastMessage : truncateToastBody(toastMessage)
-
-        await client.tui.showToast({
-            body: {
-                title: "DCP: Compress Notification",
-                message: toastMessage,
-                variant: "info",
-                duration: 5000,
-            },
-        })
-        return true
     }
+    toastMessage =
+        config.pruneNotification === "minimal" ? toastMessage : truncateToastBody(toastMessage)
 
-    await sendIgnoredMessage(client, sessionId, message, params, logger)
+    await client.tui.showToast({
+        body: {
+            title: "DCP: Compress Notification",
+            message: toastMessage,
+            variant: "info",
+            duration: 5000,
+        },
+    })
     return true
 }
 

@@ -26,7 +26,13 @@ export const purgeErrors = (
         return
     }
 
-    const allToolIds = state.toolIdList
+    // Use the messages supplied to this strategy rather than the last transform's
+    // tool list, which can be stale relative to freshly fetched session messages.
+    const allToolIds = messages.flatMap((message) =>
+        (Array.isArray(message.parts) ? message.parts : [])
+            .filter((part) => part.type === "tool" && part.callID)
+            .map((part) => part.callID as string),
+    )
     if (allToolIds.length === 0) {
         return
     }

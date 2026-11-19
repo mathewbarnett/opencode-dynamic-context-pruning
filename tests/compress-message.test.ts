@@ -22,7 +22,6 @@ function buildConfig(): PluginConfig {
         enabled: true,
         debug: false,
         pruneNotification: "off",
-        pruneNotificationType: "chat",
         commands: {
             enabled: true,
             protectedTools: [],
@@ -641,7 +640,6 @@ test("compress message mode sends one aggregated notification for batched messag
     const logger = new Logger(false)
     const config = buildConfig()
     config.pruneNotification = "detailed"
-    config.pruneNotificationType = "toast"
 
     const toastCalls: string[] = []
     const tool = createCompressMessageTool({

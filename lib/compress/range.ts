@@ -1,4 +1,4 @@
-import { tool } from "@opencode-ai/plugin"
+import { defineTool, schema, type ToolDefinition } from "../tool-schema"
 import type { ToolContext } from "./types"
 import { countTokens } from "../token-utils"
 import { rangeFormat } from "../prompts/extensions/tool"
@@ -28,39 +28,35 @@ import {
 import type { CompressRangeToolArgs } from "./types"
 
 function buildSchema(format: IdFormat) {
-    return {
-        topic: tool.schema
-            .string()
-            .describe("Short label (3-5 words) for display - e.g., 'Auth System Exploration'"),
-        content: tool.schema
-            .array(
-                tool.schema.object({
-                    startId: tool.schema
-                        .string()
-                        .describe(
-                            `Message or block ID marking the beginning of range (e.g. ${formatMessageRef(1, format)}, ${formatBlockRef(2, format)})`,
-                        ),
-                    endId: tool.schema
-                        .string()
-                        .describe(
-                            `Message or block ID marking the end of range (e.g. ${formatMessageRef(12, format)}, ${formatBlockRef(5, format)})`,
-                        ),
-                    summary: tool.schema
-                        .string()
-                        .describe("Complete technical summary replacing all content in range"),
+    return schema.object(
+        {
+            topic: schema.string(
+                "Short label (3-5 words) for display - e.g., 'Auth System Exploration'",
+            ),
+            content: schema.array(
+                schema.object({
+                    startId: schema.string(
+                        `Message or block ID marking the beginning of range (e.g. ${formatMessageRef(1, format)}, ${formatBlockRef(2, format)})`,
+                    ),
+                    endId: schema.string(
+                        `Message or block ID marking the end of range (e.g. ${formatMessageRef(12, format)}, ${formatBlockRef(5, format)})`,
+                    ),
+                    summary: schema.string(
+                        "Complete technical summary replacing all content in range",
+                    ),
                 }),
-            )
-            .describe(
                 "One or more ranges to compress, each with start/end boundaries and a summary",
             ),
-    }
+        },
+        "One or more ranges to compress, each with start/end boundaries and a summary",
+    )
 }
 
-export function createCompressRangeTool(ctx: ToolContext): ReturnType<typeof tool> {
+export function createCompressRangeTool(ctx: ToolContext): ToolDefinition {
     ctx.prompts.reload()
     const runtimePrompts = ctx.prompts.getRuntimePrompts()
 
-    return tool({
+    return defineTool({
         description: runtimePrompts.compressRange + rangeFormat(ctx.state.idFormat),
         args: buildSchema(ctx.state.idFormat),
         async execute(args, toolCtx) {

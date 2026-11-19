@@ -16,7 +16,6 @@ function buildConfig(mode: "message" | "range" = "message"): PluginConfig {
         enabled: true,
         debug: false,
         pruneNotification: "off",
-        pruneNotificationType: "chat",
         commands: {
             enabled: true,
             protectedTools: [],

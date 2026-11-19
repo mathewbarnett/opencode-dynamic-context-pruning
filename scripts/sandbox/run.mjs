@@ -35,7 +35,7 @@ const { watch } = await import(pathToFileURL(join(logger, "readable.mjs")))
 const logs = join("/lab/logs", launch.stamp)
 const raw = join(logs, "raw")
 const config = process.env.OPENCODE_CONFIG_DIR
-const cli = `/opt/opencode/node_modules/.bin/${launch.major === 1 ? "opencode" : "opencode2"}`
+const cli = `/opt/opencode/node_modules/.bin/opencode2`
 const separator = launch.model?.indexOf("/")
 const providers =
     launch.model && launch.transport
@@ -55,67 +55,34 @@ try {
     await writeFile(
         join(config, "opencode.json"),
         JSON.stringify(
-            launch.major === 1
-                ? {
-                      $schema: "https://opencode.ai/config.json",
-                      autoupdate: false,
-                      model: launch.model,
-                      small_model: launch.model,
-                      plugin: [dcp, logger],
-                      permission: { compress: "allow" },
-                  }
-                : {
-                      $schema: "https://opencode.ai/config.json",
-                      update: "disable",
-                      model: launch.model,
-                      plugins: [
-                          { package: dcp },
-                          {
-                              package: logger,
-                              options: {
-                                  directory: raw,
-                                  relay: `ws://127.0.0.1:${relay.server.address().port}`,
-                              },
-                          },
-                      ],
-                      permissions: [{ action: "compress", resource: "*", effect: "allow" }],
-                      providers,
-                  },
+            {
+                $schema: "https://opencode.ai/config.json",
+                update: "disable",
+                model: launch.model,
+                plugins: [
+                    { package: dcp },
+                    {
+                        package: logger,
+                        options: {
+                            directory: raw,
+                            relay: `ws://127.0.0.1:${relay.server.address().port}`,
+                        },
+                    },
+                ],
+                permissions: [{ action: "compress", resource: "*", effect: "allow" }],
+                providers,
+            },
             null,
             2,
         ) + "\n",
     )
-    if (launch.major === 1) {
-        // Keep the panel's source in sync, retaining user terminal preferences.
-        const path = join(config, "tui.json")
-        let tui = {}
-        try {
-            tui = JSON.parse(await readFile(path, "utf8"))
-        } catch (error) {
-            if (error.code !== "ENOENT") throw error
-        }
-        const plugins = [dcp]
-        for (const plugin of tui.plugin ?? []) {
-            if (
-                typeof plugin === "string" &&
-                (plugin === "/lab/plugins/node_modules/@mbarnett/opencode-dcp" ||
-                    plugin === "@mbarnett/opencode-dcp" ||
-                    plugin.startsWith("@mbarnett/opencode-dcp@"))
-            )
-                continue
-            plugins.push(plugin)
-        }
-        tui.plugin = plugins
-        await writeFile(path, JSON.stringify(tui, null, 2) + "\n")
-    }
     try {
         await writeFile(
             join(config, "dcp.jsonc"),
             JSON.stringify(
                 {
                     $schema:
-                        "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/main/dcp.schema.json",
-                    autoUpdate: false,
+                        "https://raw.githubusercontent.com/mathewbarnett/opencode-dynamic-context-pruning/master/dcp.schema.json",
                     debug: true,
                     pruneNotification: "off",
                 },
@@ -128,13 +95,12 @@ try {
         if (error.code !== "EEXIST") throw error
     }
     await restoreAuth(launch.major, "/input/auth.json", cli)
-    const child = spawn(cli, [...launch.args, ...(launch.major === 1 ? [] : ["--standalone"])], {
+    const child = spawn(cli, [...launch.args, "--standalone"], {
         cwd: "/lab/project",
         stdio: "inherit",
         env: {
             ...process.env,
             OPENCODE_LOG_LEVEL: "DEBUG",
-            ...(launch.major === 1 ? { OPENCODE_EXPERIMENTAL_WEBSOCKETS: "false" } : {}),
             REQUEST_LOG_DIR: raw,
         },
     })
