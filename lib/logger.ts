@@ -1,7 +1,12 @@
-import { writeFile, mkdir } from "fs/promises"
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { writeFile, mkdir, readdir, unlink } from "fs/promises"
 import { join } from "path"
 import { existsSync } from "fs"
 import { homedir } from "os"
+
+// Context snapshots contain full message and tool text. Keep only a small
+// window on disk so debug mode doesn't grow without bound.
+const MAX_CONTEXT_SNAPSHOTS = 10
 
 export class Logger {
     private logDir: string
@@ -221,6 +226,15 @@ export class Logger {
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
             const contextFile = join(contextDir, `${timestamp}.json`)
             await writeFile(contextFile, JSON.stringify(minimized, null, 2))
+
+            const snapshots = (await readdir(contextDir))
+                .filter((name) => name.endsWith(".json"))
+                .sort()
+            for (const name of snapshots.slice(
+                0,
+                Math.max(0, snapshots.length - MAX_CONTEXT_SNAPSHOTS),
+            ))
+                await unlink(join(contextDir, name)).catch(() => {})
         } catch (error) {}
     }
 }

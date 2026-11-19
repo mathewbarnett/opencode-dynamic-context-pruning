@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { Logger } from "../logger"
 import type { PruneMessagesState, SessionState, WithParts } from "../state"
 import { syncCompressionBlocks } from "../messages"

@@ -1,4 +1,5 @@
-import { tool } from "@opencode-ai/plugin"
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { defineTool, schema, type ToolDefinition } from "../tool-schema"
 import type { ToolContext } from "./types"
 import { countTokens } from "../token-utils"
 import { messageFormat } from "../prompts/extensions/tool"
@@ -15,37 +16,31 @@ import {
 import type { CompressMessageToolArgs } from "./types"
 
 function buildSchema(format: IdFormat) {
-    return {
-        topic: tool.schema
-            .string()
-            .describe(
+    return schema.object(
+        {
+            topic: schema.string(
                 "Short label (3-5 words) for the overall batch - e.g., 'Closed Research Notes'",
             ),
-        content: tool.schema
-            .array(
-                tool.schema.object({
-                    messageId: tool.schema
-                        .string()
-                        .describe(
-                            `Raw message ID to compress (e.g. ${formatMessageRef(1, format)})`,
-                        ),
-                    topic: tool.schema
-                        .string()
-                        .describe("Short label (3-5 words) for this one message summary"),
-                    summary: tool.schema
-                        .string()
-                        .describe("Complete technical summary replacing that one message"),
+            content: schema.array(
+                schema.object({
+                    messageId: schema.string(
+                        `Raw message ID to compress (e.g. ${formatMessageRef(1, format)})`,
+                    ),
+                    topic: schema.string("Short label (3-5 words) for this one message summary"),
+                    summary: schema.string("Complete technical summary replacing that one message"),
                 }),
-            )
-            .describe("Batch of individual message summaries to create in one tool call"),
-    }
+                "Batch of individual message summaries to create in one tool call",
+            ),
+        },
+        "Batch of individual message summaries to create in one tool call",
+    )
 }
 
-export function createCompressMessageTool(ctx: ToolContext): ReturnType<typeof tool> {
+export function createCompressMessageTool(ctx: ToolContext): ToolDefinition {
     ctx.prompts.reload()
     const runtimePrompts = ctx.prompts.getRuntimePrompts()
 
-    return tool({
+    return defineTool({
         description: runtimePrompts.compressMessage + messageFormat(ctx.state.idFormat),
         args: buildSchema(ctx.state.idFormat),
         async execute(args, toolCtx) {

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "fs"
 import { join, dirname } from "path"
 import { homedir } from "os"

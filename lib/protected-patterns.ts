@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 function normalizePath(input: string): string {
     // A single backslash. In source, "\\" is the one-character string; the
     // previous "\\\\" was a *two*-character string, so it only ever matched a

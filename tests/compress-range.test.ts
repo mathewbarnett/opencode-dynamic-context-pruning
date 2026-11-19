@@ -22,7 +22,6 @@ function buildConfig(): PluginConfig {
         enabled: true,
         debug: false,
         pruneNotification: "off",
-        pruneNotificationType: "chat",
         commands: {
             enabled: true,
             protectedTools: [],
@@ -271,7 +270,6 @@ test("compress range mode batches multiple ranges into one notification", async 
     const logger = new Logger(false)
     const config = buildConfig()
     config.pruneNotification = "detailed"
-    config.pruneNotificationType = "toast"
 
     const toastCalls: string[] = []
     const tool = createCompressRangeTool({

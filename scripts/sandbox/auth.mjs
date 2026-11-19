@@ -12,7 +12,6 @@ function dataPath(env) {
 
 export function authPath(major, env = process.env) {
     if (env.DCP_AUTH_PATH) return resolve(env.DCP_AUTH_PATH)
-    if (major === 1) return join(dataPath(env), "auth.json")
     try {
         return execFileSync("opencode2", ["debug", "paths", "db"], {
             env,
@@ -33,10 +32,6 @@ export function copyAuth(major, destination, image) {
             `OpenCode V${major} authentication not found at ${source}. Sign in with OpenCode or set DCP_AUTH_PATH.`,
         )
     mkdirSync(dirname(destination), { recursive: true, mode: 0o700 })
-    if (major === 1) {
-        writeFileSync(destination, readFileSync(source), { mode: 0o600 })
-        return
-    }
     // Only this short-lived exporter sees the host database, mounted read-only.
     // The sandbox receives credential records, never the host session database.
     execFileSync(
@@ -82,10 +77,6 @@ export async function exportAuth(source, destination) {
 export async function restoreAuth(major, source, cli, env = process.env) {
     const data = dataPath(env)
     mkdirSync(data, { recursive: true, mode: 0o700 })
-    if (major === 1) {
-        writeFileSync(join(data, "auth.json"), readFileSync(source), { mode: 0o600 })
-        return
-    }
     // Let this OpenCode release initialize/migrate its own isolated database,
     // then import authentication while its private server is stopped.
     execFileSync(cli, ["auth", "list", "--standalone", "--format", "json"], {

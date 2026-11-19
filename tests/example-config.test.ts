@@ -12,7 +12,11 @@ test("example config is valid JSONC and documents every schema option", () => {
     assert.deepEqual(errors, [])
 
     function checkProperties(value: Record<string, unknown>, definition: any, path = "") {
-        assert.deepEqual(Object.keys(value).sort(), Object.keys(definition.properties ?? {}).sort(), path)
+        assert.deepEqual(
+            Object.keys(value).sort(),
+            Object.keys(definition.properties ?? {}).sort(),
+            path,
+        )
         for (const [key, property] of Object.entries(definition.properties ?? {})) {
             const name = path ? `${path}.${key}` : key
             assert.ok(Object.hasOwn(value, key), `missing example option ${name}`)

@@ -20,13 +20,9 @@
         "test": "npm run build && node --test tests/*.test.mjs"
     },
     "peerDependencies": {
-        "@opencode-ai/plugin": ">=1.18.29",
-        "@opencode/plugin": "^2.0.4"
+        "@opencode/plugin": "^2.3.2"
     },
     "peerDependenciesMeta": {
-        "@opencode-ai/plugin": {
-            "optional": true
-        },
         "@opencode/plugin": {
             "optional": true
         }

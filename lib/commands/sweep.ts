@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * DCP Sweep command handler.
  * Prunes tool outputs since the last user message, or the last N tools.

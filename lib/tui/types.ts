@@ -1,21 +1,23 @@
-import type { TuiPluginModule } from "@opencode-ai/plugin/tui"
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import type { Plugin } from "@opencode/plugin/tui"
+import type { RGBA } from "@opentui/core"
 import type { buildStatsReport } from "../commands/stats"
 
-export type TuiApi = Parameters<NonNullable<TuiPluginModule["tui"]>>[0]
-export type Theme = Pick<
-    TuiApi["theme"]["current"],
-    | "primary"
-    | "accent"
-    | "text"
-    | "textMuted"
-    | "background"
-    | "backgroundElement"
-    | "borderSubtle"
-    | "selectedListItemText"
-    | "success"
-    | "warning"
-    | "error"
->
+export type TuiApi = Plugin.Context
+
+export type Theme = {
+    primary: RGBA
+    accent: RGBA
+    text: RGBA
+    textMuted: RGBA
+    background: RGBA
+    backgroundElement: RGBA
+    borderSubtle: RGBA
+    selectedListItemText: RGBA
+    success: RGBA
+    warning: RGBA
+    error: RGBA
+}
 export type ThemeColor = keyof Theme
 export type ViewApi = {
     centeredDialog?: boolean
@@ -24,12 +26,3 @@ export type ViewApi = {
     ui: { dialog: { clear(): void } }
 }
 export type StatsReport = Awaited<ReturnType<typeof buildStatsReport>>
-
-export type DcpCommand = {
-    title: string
-    name: string
-    description: string
-    slashName: string
-    slashAliases?: string[]
-    run: () => void | Promise<void>
-}

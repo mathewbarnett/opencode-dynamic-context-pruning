@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 export { handleContextCommand } from "./context"
 export { handleDecompressCommand } from "./decompress"
 export { handleHelpCommand } from "./help"

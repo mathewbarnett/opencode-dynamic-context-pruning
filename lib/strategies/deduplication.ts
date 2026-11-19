@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { PluginConfig } from "../config"
 import { Logger } from "../logger"
 import type { SessionState, WithParts } from "../state"
@@ -23,7 +24,14 @@ export const deduplicate = (
         return
     }
 
-    const allToolIds = state.toolIdList
+    // Derive tool IDs from the messages actually passed in. `state.toolIdList`
+    // reflects the last chat transform, which may be stale when compression runs
+    // against freshly fetched session messages.
+    const allToolIds = messages.flatMap((message) =>
+        (Array.isArray(message.parts) ? message.parts : [])
+            .filter((part) => part.type === "tool" && part.callID)
+            .map((part) => part.callID as string),
+    )
     if (allToolIds.length === 0) {
         return
     }
@@ -69,15 +77,17 @@ export const deduplicate = (
         }
     }
 
-    // Find duplicates - keep only the most recent (last) in each group
+    // Find duplicates: keep the most recent *successful* call in each group.
+    // Keeping the newest by recency alone can discard a successful output in
+    // favour of a later call that failed.
     const newPruneIds: string[] = []
 
     for (const [, ids] of signatureMap.entries()) {
-        if (ids.length > 1) {
-            // All except last (most recent) should be pruned
-            const idsToRemove = ids.slice(0, -1)
-            newPruneIds.push(...idsToRemove)
-        }
+        if (ids.length <= 1) continue
+        const successful = ids.filter((id) => state.toolParameters.get(id)?.status === "completed")
+        const keepPool = successful.length > 0 ? successful : ids
+        const keepId = keepPool[keepPool.length - 1]!
+        newPruneIds.push(...ids.filter((id) => id !== keepId))
     }
 
     state.stats.totalPruneTokens += getTotalToolTokens(state, newPruneIds)

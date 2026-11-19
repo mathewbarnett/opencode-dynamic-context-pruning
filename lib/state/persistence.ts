@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * State persistence module for DCP plugin.
  * Persists pruned tool IDs across sessions so they survive OpenCode restarts.
@@ -69,7 +70,11 @@ async function writePersistedSessionState(
 
     const filePath = getSessionFilePath(sessionId)
     const content = JSON.stringify(state, null, 2)
-    await fs.writeFile(filePath, content, "utf-8")
+    // Write to a temp file then rename atomically so a crash or concurrent write
+    // cannot leave a truncated file that invalidates all state for the session.
+    const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`
+    await fs.writeFile(tempPath, content, "utf-8")
+    await fs.rename(tempPath, filePath)
 
     logger.info("Saved session state to disk", {
         sessionId,

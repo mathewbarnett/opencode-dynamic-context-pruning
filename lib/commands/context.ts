@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * DCP Context Command
  * Shows a visual breakdown of token usage in the current session.
@@ -47,7 +48,7 @@ import { formatTokenCount } from "../ui/utils"
 import { isIgnoredUserMessage } from "../messages/query"
 import { isMessageCompacted } from "../state/utils"
 import { countTokens, extractCompletedToolOutput, getCurrentParams } from "../token-utils"
-import type { AssistantMessage, TextPart, ToolPart } from "@opencode-ai/sdk/v2"
+import type { MessageInfo, TextPartLike, ToolPartLike } from "../message-info"
 
 export interface ContextCommandContext {
     client: any
@@ -84,14 +85,14 @@ export function analyzeContextTokens(state: SessionState, messages: WithParts[])
         total: 0,
     }
 
-    let firstAssistant: AssistantMessage | undefined
+    let firstAssistant: MessageInfo | undefined
     for (const msg of messages) {
         if (msg.info.role === "assistant") {
-            const assistantInfo = msg.info as AssistantMessage
+            const assistantInfo = msg.info as MessageInfo
             if (
-                assistantInfo.tokens?.input > 0 ||
-                assistantInfo.tokens?.cache?.read > 0 ||
-                assistantInfo.tokens?.cache?.write > 0
+                (assistantInfo.tokens?.input ?? 0) > 0 ||
+                (assistantInfo.tokens?.cache?.read ?? 0) > 0 ||
+                (assistantInfo.tokens?.cache?.write ?? 0) > 0
             ) {
                 firstAssistant = assistantInfo
                 break
@@ -99,12 +100,12 @@ export function analyzeContextTokens(state: SessionState, messages: WithParts[])
         }
     }
 
-    let lastAssistant: AssistantMessage | undefined
+    let lastAssistant: MessageInfo | undefined
     for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i]
         if (msg.info.role === "assistant") {
-            const assistantInfo = msg.info as AssistantMessage
-            if (assistantInfo.tokens?.output > 0) {
+            const assistantInfo = msg.info as MessageInfo
+            if ((assistantInfo.tokens?.output ?? 0) > 0) {
                 lastAssistant = assistantInfo
                 break
             }
@@ -138,7 +139,7 @@ export function analyzeContextTokens(state: SessionState, messages: WithParts[])
 
         for (const part of parts) {
             if (part.type === "tool") {
-                const toolPart = part as ToolPart
+                const toolPart = part as ToolPartLike
                 if (toolPart.callID) {
                     allToolIds.add(toolPart.callID)
                     if (!isCompacted) {
@@ -170,7 +171,7 @@ export function analyzeContextTokens(state: SessionState, messages: WithParts[])
                 !isCompacted &&
                 !isIgnoredUser
             ) {
-                const textPart = part as TextPart
+                const textPart = part as TextPartLike
                 const text = textPart.text || ""
                 userTextParts.push(text)
                 if (!foundFirstUser) {

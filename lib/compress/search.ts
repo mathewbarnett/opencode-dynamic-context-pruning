@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { SessionState, WithParts } from "../state"
 import { formatBlockRef, parseBoundaryId } from "../message-ids"
 import { isIgnoredUserMessage } from "../messages/query"

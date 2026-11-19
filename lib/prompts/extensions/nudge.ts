@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { SessionState } from "../../state"
 import { formatBlockRef } from "../../message-ids"
 

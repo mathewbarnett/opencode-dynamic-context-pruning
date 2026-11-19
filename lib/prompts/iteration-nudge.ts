@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 export const ITERATION_NUDGE = `<dcp-system-reminder>
 You've been iterating for a while after the last user message.
 

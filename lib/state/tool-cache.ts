@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { SessionState, ToolStatus, WithParts } from "./index"
 import type { Logger } from "../logger"
 import { PluginConfig } from "../config"
@@ -43,15 +44,24 @@ export function syncToolCache(
                     turnProtectionTurns > 0 &&
                     state.currentTurn - turnCounter < turnProtectionTurns
 
-                if (state.toolParameters.has(part.callID)) {
-                    continue
-                }
-
-                if (isProtectedByTurn) {
-                    continue
-                }
-
                 const tokenCount = countToolTokens(part)
+                const existing = state.toolParameters.get(part.callID)
+
+                if (isProtectedByTurn && !existing) {
+                    continue
+                }
+
+                // A tool part is first observed as pending/running and only later
+                // becomes completed or errored. Refresh mutable fields on every sync
+                // so purgeErrors/deduplication see the real status and parameters.
+                if (existing) {
+                    existing.parameters = part.state?.input ?? {}
+                    existing.metadata = "metadata" in part.state ? part.state.metadata : undefined
+                    existing.status = part.state.status as ToolStatus | undefined
+                    existing.error = part.state.status === "error" ? part.state.error : undefined
+                    existing.tokenCount = tokenCount
+                    continue
+                }
 
                 state.toolParameters.set(part.callID, {
                     tool: part.tool,

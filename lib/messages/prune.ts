@@ -1,10 +1,11 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { SessionState, WithParts } from "../state"
 import type { Logger } from "../logger"
 import type { PluginConfig } from "../config"
 import { isMessageCompacted } from "../state/utils"
 import { createSyntheticUserMessage, replaceBlockIdsWithBlocked } from "./utils"
 import { getLastUserMessage } from "./query"
-import type { UserMessage } from "@opencode-ai/sdk/v2"
+import type { MessageInfo } from "../message-info"
 import { formatBlockRef } from "../message-ids"
 
 const PRUNED_TOOL_OUTPUT_REPLACEMENT =
@@ -20,56 +21,9 @@ export const prune = (
     summaryBase?: WithParts,
 ): void => {
     filterCompressedRanges(state, logger, config, messages, summaryBase)
-    // pruneFullTool(state, logger, messages)
     pruneToolOutputs(state, logger, messages)
     pruneToolInputs(state, logger, messages)
     pruneToolErrors(state, logger, messages)
-}
-
-const pruneFullTool = (state: SessionState, logger: Logger, messages: WithParts[]): void => {
-    const messagesToRemove: string[] = []
-
-    for (const msg of messages) {
-        if (isMessageCompacted(state, msg)) {
-            continue
-        }
-
-        const parts = Array.isArray(msg.parts) ? msg.parts : []
-        const partsToRemove: string[] = []
-
-        for (const part of parts) {
-            if (part.type !== "tool") {
-                continue
-            }
-
-            if (!state.prune.tools.has(part.callID)) {
-                continue
-            }
-            if (part.tool !== "edit" && part.tool !== "write") {
-                continue
-            }
-
-            partsToRemove.push(part.callID)
-        }
-
-        if (partsToRemove.length === 0) {
-            continue
-        }
-
-        msg.parts = parts.filter(
-            (part) => part.type !== "tool" || !partsToRemove.includes(part.callID),
-        )
-
-        if (msg.parts.length === 0) {
-            messagesToRemove.push(msg.info.id)
-        }
-    }
-
-    if (messagesToRemove.length > 0) {
-        const result = messages.filter((msg) => !messagesToRemove.includes(msg.info.id))
-        messages.length = 0
-        messages.push(...result)
-    }
 }
 
 const pruneToolOutputs = (state: SessionState, logger: Logger, messages: WithParts[]): void => {
@@ -198,7 +152,7 @@ const filterCompressedRanges = (
                 const userMessage = getLastUserMessage(messages, msgIndex) ?? summaryBase
 
                 if (userMessage) {
-                    const userInfo = userMessage.info as UserMessage
+                    const userInfo = userMessage.info as MessageInfo
                     // Persisted summaries can outlive the host's tag format.
                     let renderedSummary = rawSummaryContent
                     if (state.idFormat === "compact") {

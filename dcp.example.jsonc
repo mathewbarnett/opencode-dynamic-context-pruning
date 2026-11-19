@@ -2,44 +2,40 @@
     // Reference only: copy desired settings to ~/.config/opencode/dcp.jsonc or
     // <project>/.opencode/dcp.jsonc. This example is not loaded automatically.
     // Project values override global values; protected-tool lists are additive.
-    "$schema": "https://raw.githubusercontent.com/Opencode-DCP/opencode-dynamic-context-pruning/master/dcp.schema.json",
+    "$schema": "https://raw.githubusercontent.com/mathewbarnett/opencode-dynamic-context-pruning/master/dcp.schema.json",
 
     // Enable the plugin. Defaults are shown throughout this file.
     "enabled": true,
-    // V1 npm auto-update setting; the V2 implementation does not run it.
-    "autoUpdate": true,
     // Write diagnostic information to the DCP log directory.
     "debug": false,
     // Notification verbosity: "off", "minimal", or "detailed".
-    // V2 currently logs reports rather than showing chat/toast notifications.
+    // Notifications are delivered as toasts.
     "pruneNotification": "detailed",
-    // Notification destination: "chat" or "toast" (V2 limitation above).
-    "pruneNotificationType": "chat",
 
     "commands": {
         // Enable the /dcp panel and commands.
         "enabled": true,
         // Additional tools protected from command-based pruning; supports * and ?.
         // Example: ["mcp_*", "my_tool_?"]
-        "protectedTools": []
+        "protectedTools": [],
     },
     "manualMode": {
         // Start new sessions in manual mode; automatic compression is disabled.
         "enabled": false,
         // Keep automatic cleanup strategies available while in manual mode.
-        "automaticStrategies": true
+        "automaticStrategies": true,
     },
     "turnProtection": {
         // Protect recent tool outputs from pruning.
         "enabled": false,
         // Number of recent turns to protect (at least 1).
-        "turns": 4
+        "turns": 4,
     },
     "experimental": {
         // Allow processing and compression in subagent sessions.
         "allowSubAgents": false,
         // Enable prompt files in dcp-prompts override directories.
-        "customPrompts": false
+        "customPrompts": false,
     },
     // File path glob patterns whose matching tool calls should be protected.
     // Example: ["**/AGENTS.md", "**/*.config.ts"]
@@ -48,10 +44,10 @@
     "compress": {
         // "range" summarizes spans; experimental "message" summarizes individual messages.
         "mode": "range",
-        // "allow" runs without asking; "deny" disables compression. V2 currently
-        // blocks "ask" instead of displaying a permission prompt.
+        // "allow" runs without asking; "ask" uses OpenCode's native permission
+        // prompt; "deny" disables compression.
         "permission": "allow",
-        // Include compression summaries in notifications (V2 reports are logged).
+        // Include compression summaries in notifications.
         "showCompression": false,
         // Add active summary tokens to the upper nudge threshold.
         "summaryBuffer": true,
@@ -75,14 +71,14 @@
         // Preserve content enclosed in <protect>...</protect> tags.
         "protectTags": false,
         // Preserve user messages verbatim; large pasted messages then remain large.
-        "protectUserMessages": false
+        "protectUserMessages": false,
     },
     "strategies": {
         "deduplication": {
             // Remove older duplicate outputs for identical tool calls.
             "enabled": true,
             // Additional tool names/globs excluded from deduplication.
-            "protectedTools": []
+            "protectedTools": [],
         },
         "purgeErrors": {
             // Prune inputs of old failed calls; retain their error messages.
@@ -90,7 +86,7 @@
             // Wait this many turns before pruning failed tool inputs (minimum 1).
             "turns": 4,
             // Additional tool names/globs excluded from error purging.
-            "protectedTools": []
-        }
-    }
+            "protectedTools": [],
+        },
+    },
 }

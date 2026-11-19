@@ -1,8 +1,10 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /** @jsxImportSource @opentui/solid */
 import type { Plugin } from "@opencode/plugin/tui"
 import { ContextDialog, PanelDialog, StatsDialog, StatusDialog } from "../tui/dialogs"
 import type { ViewApi } from "../tui/types"
 import { rpc } from "./rpc"
+import { createToastSubscriber } from "./notifications"
 import { panelTheme } from "./theme"
 
 export async function setup(ctx: Plugin.Context) {
@@ -80,6 +82,27 @@ export async function setup(ctx: Plugin.Context) {
                   : String(cause)
         show(() => <StatusDialog api={api} title="DCP" eyebrow="DCP Error" message={message} />)
     }
+
+    const onNotification = createToastSubscriber({
+        show: (toast) => {
+            ctx.ui.toast.show(toast)
+            const route = ctx.ui.router.current()
+            if (toast.sessionID && route.type === "session" && route.sessionID !== toast.sessionID)
+                void ctx.attention.notify({
+                    title: toast.title ?? "DCP",
+                    message: toast.message,
+                })
+        },
+    })
+    const unsubscribeNotification = client.events.on("notification", onNotification)
+    const unsubscribeOpenPanel = client.events.on("openPanel", ({ data }) => {
+        const route = ctx.ui.router.current()
+        // The event is broadcast to every TUI session; only the session that
+        // invoked /dcp should actually pop its panel.
+        if (route.type !== "session" || route.sessionID !== data.sessionID) return
+        void open()
+    })
+
     ctx.ui.slot({
         append: "app",
         render() {
@@ -92,25 +115,15 @@ export async function setup(ctx: Plugin.Context) {
                         description: "Open DCP panel",
                         group: "DCP",
                         palette: true,
-                        slash: { name: "dcp", arguments: true },
-                        run: async (input) => {
-                            if (!input?.trim()) return open()
-                            const route = ctx.ui.router.current()
-                            if (route.type !== "session") return open()
-                            try {
-                                await ctx.client.session.command({
-                                    sessionID: route.sessionID,
-                                    name: "dcp",
-                                    text: input,
-                                })
-                            } catch (cause) {
-                                error(cause)
-                            }
-                        },
+                        run: () => open(),
                     },
                 ],
             }))
             return null
         },
     })
+    return () => {
+        unsubscribeNotification()
+        unsubscribeOpenPanel()
+    }
 }

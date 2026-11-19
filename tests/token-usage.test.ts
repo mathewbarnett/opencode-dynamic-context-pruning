@@ -12,7 +12,6 @@ function buildConfig(maxContextLimit: number, minContextLimit = 1): PluginConfig
         enabled: true,
         debug: false,
         pruneNotification: "off",
-        pruneNotificationType: "chat",
         commands: {
             enabled: true,
             protectedTools: [],

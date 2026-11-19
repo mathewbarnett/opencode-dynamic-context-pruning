@@ -73,7 +73,9 @@ test("Code Mode protections survive caching, strategy selection, and compression
     const unprotected = { ...config, protectedFilePatterns: [] }
     deduplicate(state, logger, unprotected, messages)
     purgeErrors(state, logger, unprotected, messages)
-    assert.deepEqual([...state.prune.tools.keys()], ["first", "second", "failed"])
+    // Dedup now keeps the most recent successful duplicate ("second") rather
+    // than the newest call regardless of outcome; the failed call is purged.
+    assert.deepEqual([...state.prune.tools.keys()], ["first", "failed"])
 })
 
 test("Code Mode honors protected tool names as well as file paths", () => {

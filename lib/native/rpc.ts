@@ -1,7 +1,16 @@
-import { tool } from "@opencode-ai/plugin"
+// SPDX-License-Identifier: AGPL-3.0-or-later
+import { z } from "zod"
 
-const z = tool.schema
-const session = z.object({ sessionID: z.string() })
+export const notificationEvent = z.object({
+    title: z.string().optional(),
+    message: z.string(),
+    variant: z.enum(["info", "success", "warning", "error"]).optional(),
+    duration: z.number().optional(),
+    sessionID: z.string().optional(),
+})
+
+export type NotificationEvent = z.infer<typeof notificationEvent>
+
 const stats = z.object({
     sessionTokens: z.number(),
     sessionSummaryTokens: z.number(),
@@ -15,6 +24,7 @@ const stats = z.object({
         sessionCount: z.number(),
     }),
 })
+
 const context = z.object({
     system: z.number(),
     user: z.number(),
@@ -31,9 +41,12 @@ const context = z.object({
 export const rpc = {
     id: "dcp",
     methods: {
-        status: { input: z.object({}), output: z.object({ enabled: z.boolean() }) },
+        status: {
+            input: z.object({}),
+            output: z.object({ enabled: z.boolean() }),
+        },
         snapshot: {
-            input: session,
+            input: z.object({ sessionID: z.string() }),
             output: z.object({
                 manualMode: z.boolean(),
                 canCompress: z.boolean(),
@@ -42,7 +55,15 @@ export const rpc = {
                 stats,
             }),
         },
-        manual: { input: session.extend({ enabled: z.boolean() }), output: z.object({}) },
+        manual: {
+            input: z.object({ sessionID: z.string(), enabled: z.boolean() }),
+            output: z.object({}),
+        },
     },
-    events: {},
+    events: {
+        notification: { schema: notificationEvent },
+        // Scoped to the session that invoked /dcp so other open sessions don't
+        // pop their panels when a command runs elsewhere.
+        openPanel: { schema: z.object({ sessionID: z.string() }) },
+    },
 } as const

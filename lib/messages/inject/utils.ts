@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import type { SessionState, WithParts } from "../../state"
 import type { PluginConfig } from "../../config"
 import {
@@ -6,7 +7,7 @@ import {
     renderMessagePriorityGuidance,
 } from "../../prompts/extensions/nudge"
 import type { RuntimePrompts } from "../../prompts/store"
-import type { UserMessage } from "@opencode-ai/sdk/v2"
+import type { MessageInfo } from "../../message-info"
 import {
     type CompressionPriorityMap,
     type MessagePriority,
@@ -35,11 +36,13 @@ export interface LastNonIgnoredMessage {
 }
 
 export function getNudgeFrequency(config: PluginConfig): number {
-    return Math.max(1, Math.floor(config.compress.nudgeFrequency || 1))
+    const value = Number(config.compress.nudgeFrequency)
+    return Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 1
 }
 
 export function getIterationNudgeThreshold(config: PluginConfig): number {
-    return Math.max(1, Math.floor(config.compress.iterationNudgeThreshold || 1))
+    const value = Number(config.compress.iterationNudgeThreshold)
+    return Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 1
 }
 
 export function findLastNonIgnoredMessage(messages: WithParts[]): LastNonIgnoredMessage | null {
@@ -77,7 +80,7 @@ export function getModelInfo(messages: WithParts[]): LastUserModelContext {
         }
     }
 
-    const userInfo = lastUserMessage.info as UserMessage
+    const userInfo = lastUserMessage.info as MessageInfo
     return {
         providerId: userInfo.model.providerID,
         modelId: userInfo.model.modelID,
@@ -97,7 +100,7 @@ function resolveContextTokenLimit(
         }
 
         if (typeof limit === "number") {
-            return limit
+            return Number.isFinite(limit) && limit >= 0 ? limit : undefined
         }
 
         if (!limit.endsWith("%") || state.modelContextLimit === undefined) {
