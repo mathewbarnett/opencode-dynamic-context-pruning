@@ -126,3 +126,33 @@ test("history marks completed compactions as summary messages", () => {
     assert.equal(summary.info.summary, true)
     assert.equal(summary.parts.length, 0)
 })
+
+test("history retains an entry missing a timestamp using a real neighbouring timestamp", () => {
+    const undated: any[] = [
+        { id: "m1", type: "user", time: { created: 1000 }, text: "first", skills: [] },
+        { id: "m2", type: "user", text: "second", skills: [] },
+        { id: "m3", type: "user", time: { created: 3000 }, text: "third", skills: [] },
+    ]
+    const messages = history(undated, session as any)
+    assert.equal(messages.length, 3)
+    assert.equal(messages[1]!.info.id, "m2")
+    assert.equal(messages[1]!.info.time.created, 1000)
+})
+
+test("history falls back to the next real timestamp for an undated first entry", () => {
+    const undated: any[] = [
+        { id: "m1", type: "user", text: "first", skills: [] },
+        { id: "m2", type: "user", time: { created: 2000 }, text: "second", skills: [] },
+    ]
+    const messages = history(undated, session as any)
+    assert.equal(messages.length, 2)
+    assert.equal(messages[0]!.info.time.created, 2000)
+})
+
+test("history drops entries when the session has no real timestamps at all", () => {
+    const messages = history(
+        [{ id: "m1", type: "user", text: "first", skills: [] }] as any,
+        session as any,
+    )
+    assert.equal(messages.length, 0)
+})

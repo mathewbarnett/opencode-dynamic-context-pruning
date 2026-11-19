@@ -9,24 +9,43 @@ type Entry = History[number]
 type Part = WithParts["parts"][number]
 
 /**
+ * Resolve a timestamp from real values already present in the session. An entry
+ * that lacks `time.created` borrows the nearest neighbouring entry's timestamp
+ * instead of being dropped; we never invent a value that the session did not
+ * contain. Returns undefined only when no timestamp exists anywhere in the list.
+ */
+function resolveCreated(entries: readonly Entry[], index: number): number | undefined {
+    const direct = entries[index]?.time?.created
+    if (typeof direct === "number" && Number.isFinite(direct)) return direct
+    for (let i = index - 1; i >= 0; i--) {
+        const value = entries[i]?.time?.created
+        if (typeof value === "number" && Number.isFinite(value)) return value
+    }
+    for (let i = index + 1; i < entries.length; i++) {
+        const value = entries[i]?.time?.created
+        if (typeof value === "number" && Number.isFinite(value)) return value
+    }
+    return undefined
+}
+
+/**
  * Build engine metadata from a real stored session entry. Returns undefined when
- * the entry is missing or lacks the fields the shared engine requires. We never
- * synthesize timestamps, token counts, model identity, or message IDs here:
- * fabricated values previously fed compaction detection and nudge thresholds
- * with data that did not exist in the session.
+ * the entry is missing or no real timestamp can be resolved. Token counts, model
+ * identity and message IDs are always taken from the entry/session verbatim.
  */
 function info(
     entry: Entry | undefined,
     session: Session,
     role: string,
+    created: number | undefined,
 ): WithParts["info"] | undefined {
-    if (!entry || typeof entry.time?.created !== "number") return undefined
+    if (!entry || created === undefined) return undefined
     const model = entry.type === "assistant" ? entry.model : session.model
     return {
         id: entry.id,
         role,
         sessionID: session.id,
-        time: { created: entry.time.created },
+        time: { created },
         agent: entry.type === "assistant" ? entry.agent : session.agent,
         model: model
             ? { providerID: model.providerID, modelID: model.id, variant: model.variant }
@@ -40,10 +59,10 @@ function info(
 
 /** Project stored entries into the engine's working shape for the compress tool. */
 export function history(entries: History, session: Session): WithParts[] {
-    return entries.flatMap((entry): WithParts[] => {
+    return entries.flatMap((entry, index): WithParts[] => {
         const role =
             entry.type === "assistant" || entry.type === "compaction" ? "assistant" : "user"
-        const meta = info(entry, session, role)
+        const meta = info(entry, session, role, resolveCreated(entries, index))
         if (!meta) return []
         const base = { sessionID: session.id, messageID: entry.id }
         if (entry.type === "assistant") {
@@ -110,6 +129,7 @@ function output(content: ReadonlyArray<{ type: string; text?: string }>): unknow
  */
 export function view(native: Message[], entries: History, session: Session) {
     const byID = new Map(entries.map((entry) => [entry.id, entry]))
+    const indexById = new Map(entries.map((entry, index) => [entry.id, index]))
     const results = new Map<string, ToolResultPart>()
     const owners = new Map<string, string>()
     const links = new Map<ContentPart, Part>()
@@ -124,7 +144,12 @@ export function view(native: Message[], entries: History, session: Session) {
         if (!message.id || !["user", "assistant"].includes(message.role)) continue
         const entry = byID.get(message.id)
         if (!entry || entry.type === "compaction") continue
-        const meta = info(entry, session, message.role)
+        const meta = info(
+            entry,
+            session,
+            message.role,
+            resolveCreated(entries, indexById.get(message.id) ?? 0),
+        )
         if (!meta) continue
         const base = { sessionID: session.id, messageID: message.id }
         const parts: Part[] = []
